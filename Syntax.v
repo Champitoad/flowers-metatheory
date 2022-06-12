@@ -168,7 +168,7 @@ Fixpoint build_subst (l : list (nat * list flower)) : subst :=
 
 Notation "{| l |}" := (build_subst l).
 
-Definition unisubst (i : nat) '(Garden Fs) : subst :=
+Definition unisubst (i : nat) '(· Fs) : subst :=
   build_subst [(i, Fs)].
 
 Notation "i ≔ Θ" := (unisubst i Θ) (at level 10).
@@ -224,7 +224,7 @@ Qed.
 (** * Rules *)
 
 Definition juxt '(· Fs) '(· Fs') :=
-  Garden (Fs ++ Fs').
+  · (Fs ++ Fs').
 
 Infix "∪" := juxt.
 
