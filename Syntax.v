@@ -1,15 +1,9 @@
 Require Import stdpp.list stdpp.relations.
 Require Import ssreflect.
-Require Import String PeanoNat.
+Require Import String.
 Open Scope string_scope.
 
 Require Import Flowers.Utils.
-
-(** Names *)
-
-Definition name : Type := string.
-Definition string_to_name : string -> name := fun x => x.
-Coercion string_to_name : string >-> name.
 
 (** Flowers *)
 
@@ -20,8 +14,13 @@ Inductive flower :=
 with garden :=
 | Garden : list flower -> garden.
 
+Coercion Atom : name >-> flower.
+
 Definition fg : flower -> garden := fun f => Garden [f].
 Coercion fg : flower >-> garden.
+
+Definition gl : garden -> list flower := fun '(Garden Fs) => Fs.
+Coercion gl : garden >-> list.
 
 Notation "□ i" := (Hole i) (format "□ i", at level 1).
 Notation "♯ a" := (Atom a) (format "♯ a", at level 1).
@@ -30,18 +29,15 @@ Notation "Γ ⊢ Π" := (Flower Γ Π) (at level 65).
 Notation "Γ ⊢" := (Flower Γ nil) (at level 65).
 Notation "⊢ Π" := (Flower (Garden nil) Π) (at level 65).
 
-Notation "· Fs" := (Garden Fs) (at level 63).
+Notation "⋅ Fs" := (Garden Fs) (format "⋅ Fs", at level 63).
 Notation "∅" := (Garden nil).
 
 (** * Induction principles *)
 
-Definition lift_flower_pred	(P : flower -> Prop) : garden -> Prop :=
-  fun '(· Fs) => Forall P Fs.
-
 Definition flower_induction_full :
   ∀ (P : flower -> Prop)
     (Pi : nat -> Prop) (Pa : name -> Prop),
-  let PΓ : garden -> Prop := lift_flower_pred P in
+  let PΓ : garden -> Prop := Forall P in
   (∀ (i : nat), Pi i) ->
   (∀ (a : name), Pa a) ->
   (∀ (i : nat), Pi i -> P □i) ->
@@ -49,7 +45,7 @@ Definition flower_induction_full :
   (∀ (Γ : garden) (Π : list garden),
     PΓ Γ -> Forall PΓ Π -> P (Γ ⊢ Π)) ->
   (∀ (Fs : list flower),
-    Forall P Fs -> PΓ (· Fs)) ->
+    Forall P Fs -> PΓ (⋅ Fs)) ->
   ∀ (f : flower), P f.
 Proof.
   move => P Pi Pa PΓ Hi Ha IHi IHa IHF IHΓ.
@@ -79,7 +75,7 @@ Definition garden_induction_full :
     P Γ -> Forall P Π -> P (Γ ⊢ Π)) ->
   P ∅ ->
   (∀ (F : flower) (Fs : list flower),
-    P F -> P (· Fs) -> P (· F :: Fs)) ->
+    P F -> P (⋅ Fs) -> P (⋅ F :: Fs)) ->
   ∀ (Γ : garden), P Γ.
 Proof.
   move => P Pi Pa Hi Ha IHi IHa IHF IHnil IHcons.
@@ -99,7 +95,7 @@ Qed.
 
 Definition flower_induction	:
   ∀ (P : flower -> Prop),
-  let PΓ : garden -> Prop := lift_flower_pred P in
+  let PΓ : garden -> Prop := Forall P in
   (∀ (i : nat), P □i) ->
   (∀ (a : name), P ♯a) ->
   (∀ (Γ : garden) (Π : list garden),
@@ -122,7 +118,7 @@ Definition garden_induction	:
     P Γ -> Forall P Π -> P (Γ ⊢ Π)) ->
   P ∅ ->
   (∀ (F : flower) (Fs : list flower),
-    P F -> P (· Fs) -> P (· F :: Fs)) ->
+    P F -> P (⋅ Fs) -> P (⋅ F :: Fs)) ->
   ∀ (Γ : garden), P Γ.
 Proof.
   move => P IHi IHa IHF IHnil IHcons.
@@ -141,17 +137,15 @@ Fixpoint ffill (s : subst) (F : flower) : list flower :=
   match F with
   | □i => s i
   | ♯_ => [F]
-  | Γ ⊢ Π => [· gfill s Γ ⊢ (fun Δ => · gfill s Δ) <$> Π]
+  | Γ ⊢ Π => [⋅ gfill s Γ ⊢ (fun Δ => ⋅ gfill s Δ) <$> Π]
   end
 with gfill (s : subst) (Γ : garden) : list flower :=
-  match Γ with
-  | · Fs => F ← Fs; ffill s F
-  end.
+  F ← (gl Γ); ffill s F.
 
 Definition fill (s : subst) (Γ : garden) : garden :=
-  · gfill s Γ.
+  ⋅ gfill s Γ.
 
-Notation "s 'in' Γ" := (fill s Γ) (at level 30).
+Notation "s @ Γ" := (fill s Γ) (at level 30).
 
 Definition id_subst	: subst := fun i => [□i].
 
@@ -168,16 +162,16 @@ Fixpoint build_subst (l : list (nat * list flower)) : subst :=
 
 Notation "{| l |}" := (build_subst l).
 
-Definition unisubst (i : nat) '(· Fs) : subst :=
+Definition unisubst (i : nat) '(⋅ Fs) : subst :=
   build_subst [(i, Fs)].
 
 Notation "i ≔ Θ" := (unisubst i Θ) (at level 10).
 
-Compute 0 ≔ ♯"a" in · [□0; □1].
-Compute {|[ (1, [♯"a"]) ; (0, [♯"b"]) ]|} in · [□0; □1].
+Compute 0 ≔ "a" @ ⋅ [□0; □1].
+Compute {|[ (1, [♯"a"]) ; (0, [♯"b"]) ]|} @ ⋅ [□0; □1].
 
 Lemma fill_id_subst : ∀ Γ,
-  id_subst in Γ = Γ.
+  id_subst @ Γ = Γ.
 Proof.
   unfold fill.
   elim/garden_induction => [i |a |Γ Π IHΓ IHΠ | |F Fs H IH] //=.
@@ -188,7 +182,7 @@ Proof.
 Qed.
 
 Lemma fill_comp_subst : ∀ Γ s1 s2,
-  (s2 ∘ s1) in Γ = s2 in (s1 in Γ).
+  (s2 ∘ s1) @ Γ = s2 @ (s1 @ Γ).
 Proof.
   move => Γ s1 s2.
   rewrite /fill/comp_subst//=.
@@ -197,7 +191,7 @@ Proof.
   * rewrite IHΓ.
     rewrite Forall_eq_map in IHΠ.
     rewrite IHΠ.
-    set Γ' := · gfill s2 (· gfill s1 Γ).
+    set Γ' := ⋅ gfill s2 (⋅ gfill s1 Γ).
     rewrite -list_fmap_compose.
     set u := ((Garden ∘ (gfill s2)) ∘ (Garden ∘ (gfill s1)))%stdpp.
     set u' := fun x => Garden (gfill s2 (Garden (gfill s1 x))).
@@ -206,7 +200,7 @@ Proof.
 Qed.
 
 Definition sub Γ Δ :=
-  exists s, s in Γ = Δ.
+  exists s, s @ Γ = Δ.
 
 Local Instance sub_po: PreOrder sub.
 Proof.
@@ -223,8 +217,8 @@ Qed.
 
 (** * Rules *)
 
-Definition juxt '(· Fs) '(· Fs') :=
-  · (Fs ++ Fs').
+Definition juxt '(⋅ Fs) '(⋅ Fs') :=
+  ⋅ (Fs ++ Fs').
 
 Infix "∪" := juxt.
 
@@ -235,26 +229,26 @@ Inductive step : garden -> garden -> Prop :=
 (** ** Pollination *)
 
 | R_wpol (F G : flower) (i : nat) :
-  · [F; G] ~>
-  F ∪ i ≔ F in G
+  ⋅ [F; G] ~>
+  F ∪ i ≔ F @ G
 
 | R_co_wpol (F G : flower) (i : nat) :
-  F ∪ i ≔ F in G ~>
-  · [F; G]
+  F ∪ i ≔ F @ G ~>
+  ⋅ [F; G]
 
 | R_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
   F ∪ Γ ⊢ Δ :: Π ~>
-  F ∪ Γ ⊢ i ≔ F in Δ :: Π
+  F ∪ Γ ⊢ i ≔ F @ Δ :: Π
 
 | R_co_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
-  F ∪ Γ ⊢ i ≔ F in Δ :: Π ~>
+  F ∪ Γ ⊢ i ≔ F @ Δ :: Π ~>
   F ∪ Γ ⊢ Δ :: Π
 
 (** ** Reproduction *)
 
 | R_rep (Γ : garden) (Δs Π : list garden) :
   (⊢ Δs) ∪ Γ ⊢ Π ~>
-  Γ ⊢ (fun Δ => · [Δ ⊢ Π]) <$> Δs
+  Γ ⊢ (fun Δ => ⋅ [Δ ⊢ Π]) <$> Δs
 
 (** ** Decomposition *)
 
@@ -268,7 +262,7 @@ Inductive step : garden -> garden -> Prop :=
 
 | R_perm_g (Fs Fs' : list flower) :
   Fs ≡ₚ Fs' ->
-  · Fs ~> · Fs'
+  ⋅ Fs ~> ⋅ Fs'
 
 | R_perm_f (Π Π' : list garden) (Γ : garden) :
   Π ≡ₚ Π' ->
@@ -283,20 +277,20 @@ Inductive step : garden -> garden -> Prop :=
 
 | R_ctx (Γ Δ X : garden) (i : nat) :
   Γ ~> Δ ->
-  i ≔ Γ in X ~> i ≔ Δ in X
+  i ≔ Γ @ X ~> i ≔ Δ @ X
 
 where "Γ ~> Δ" := (step Γ Δ).
 
 Infix "~>*" := (rtc step) (at level 80).
 
 Example deriv_contraction :
-  · [♯"a"; ♯"b"] ~>* · [♯"a"; ♯"b"; ♯"b"].
+  ⋅ [♯"a"; ♯"b"] ~>* ⋅ [♯"a"; ♯"b"; ♯"b"].
 Proof.
-  transitivity (· [♯"a"; ♯"b"; □0]).
+  transitivity (⋅ [♯"a"; ♯"b"; □0]).
   * apply rtc_once.
-    refine (R_ctx ∅ □0 (·[♯"a"; ♯"b"; □1]) 1 _).
+    refine (R_ctx ∅ □0 (⋅[♯"a"; ♯"b"; □1]) 1 _).
     refine (R_hole 0).
   * apply rtc_once.
-    refine (R_ctx (·[♯"b"; □0]) (·[♯"b"; ♯"b"]) (·[♯"a"; □0]) 0 _).
+    refine (R_ctx (⋅[♯"b"; □0]) (⋅[♯"b"; ♯"b"]) (⋅[♯"a"; □0]) 0 _).
     refine (R_wpol _ _ 0).
 Qed.

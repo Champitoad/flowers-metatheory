@@ -1,4 +1,6 @@
 -R . Flowers
 
 Syntax.v
+Semantics.v
+Metatheory.v
 Utils.v

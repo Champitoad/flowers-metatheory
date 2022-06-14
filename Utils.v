@@ -1,5 +1,12 @@
 Require Import ssreflect.
 Require Import stdpp.list stdpp.relations.
+Require Import String.
+
+(** Names *)
+
+Definition name : Type := string.
+Definition string_to_name : string -> name := fun x => x.
+Coercion string_to_name : string >-> name.
 
 (** * Tactics *)
 
@@ -112,16 +119,48 @@ Definition lequiv {A} (R : relation A) : relation (list A) :=
 Infix "≡ₗ@{ R }" :=
   (lequiv R) (at level 70, no associativity, only parsing).
 
+Lemma equiv_Forall {A} (P Q : A -> Prop) (l : list A) :
+  (∀ x, P x <-> Q x) ->
+  Forall P l <-> Forall Q l.
+Proof.
+Admitted.
+
+Instance Forall2_Equivalence {A} (e : Equiv A) : Equivalence (Forall2 e).
+Proof.
+Admitted.
+
+Lemma Forall_equiv_map {A B} {e : Equiv B} (l : list A) (f g : A -> B) :
+  (Forall (fun x => e (f x) (g x)) l) <->
+  Forall2 e (f <$> l) (g <$> l).
+Proof.
+  split.
+  * elim: l => [H |a l IHl H]; try done.
+    decompose_Forall_hyps. econs.
+  * elim: l => [H |a l IHl H]; try done.
+    rewrite [f <$> _]fmap_cons [g <$> _]fmap_cons in H.
+    inv H. econs.
+Qed.
+
+Lemma Forall2_Forall2_Proper {A} {e : Equiv A} :
+  ∀ (f : list A -> A) {Hp : Proper (Forall2 e ==> e) f} (l l' : list (list A)),
+  Forall2 (Forall2 e) l l' ->
+  Forall2 e (f <$> l) (f <$> l').
+Admitted.
+
+Lemma Forall2_eq_eq {A} : forall (l l' : list A),
+  Forall2 eq l l' <-> l = l'.
+Proof.
+  induction l, l'; split; try done.
+  1-3: elim; intros; f_equal; done.
+  by elim.
+Qed.
+
 Lemma Forall_eq_map {A B} (l : list A) (f g : A -> B) :
   (Forall (fun x => f x = g x) l) <->
   f <$> l = g <$> l.
 Proof.
-  split.
-  * elim: l => [H |a l IHl H]; try done.
-    decompose_Forall_hyps. rewrite H IHl //.
-  * elim: l => [H |a l IHl H]; try done.
-    rewrite [f <$> _]fmap_cons [g <$> _]fmap_cons in H.
-    inv H. econs.
+  rewrite -Forall2_eq_eq.
+  apply Forall_equiv_map.
 Qed.
 
 Lemma map_id_ext {A} (l : list A) :
