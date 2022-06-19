@@ -229,12 +229,12 @@ Inductive step : garden -> garden -> Prop :=
 (** ** Pollination *)
 
 | R_wpol (F G : flower) (i : nat) :
-  ⋅ [F; G] ~>
+  F ∪ G ~>
   F ∪ i ≔ F @ G
 
 | R_co_wpol (F G : flower) (i : nat) :
   F ∪ i ≔ F @ G ~>
-  ⋅ [F; G]
+  F ∪ G
 
 | R_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
   F ∪ Γ ⊢ Δ :: Π ~>

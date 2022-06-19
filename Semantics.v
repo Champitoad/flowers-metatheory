@@ -31,6 +31,9 @@ Definition And :=
 Definition Or :=
   foldr FOr ⊥.
 
+Notation "⋀ As" := (And As) (at level 5).
+Notation "⋁ As" := (Or As) (at level 5).
+
 (** * Rules *)
 
 Reserved Infix "⟹" (at level 90).
@@ -189,7 +192,7 @@ Definition eqderiv (A B : form) : Prop :=
 
 Infix "⟺" := eqderiv (at level 95).
 
-Instance equiv_eqderiv : Equivalence eqderiv.
+#[export] Instance equiv_eqderiv : Equivalence eqderiv.
 Proof.
   econs; repeat red.
   * move => A. split; apply S_ax.
@@ -199,11 +202,7 @@ Proof.
     - apply (S_cut _ _ _ _ HCB HBA).
 Qed.
 
-Add Relation form eqderiv
-  transitivity proved by Equivalence_Transitive
-  as eqderiv.
-
-Instance : Equiv form := eqderiv.
+#[export] Instance : Equiv form := eqderiv.
 
 Add Morphism FAnd with signature
   eqderiv ==> eqderiv ==> eqderiv
@@ -271,31 +270,19 @@ Add Parametric Morphism Γ C : (λ A, deriv (A :: Γ) C) with signature
 Admitted.
 
 Add Parametric Morphism : deriv with signature
-  eq ==> eqderiv ==> iff
+  Forall2 eqderiv ==> eqderiv ==> iff
   as proper_deriv_concl.
 Admitted.
 
-Lemma eqderiv_concl {A B Γ} :
-  A ⟺ B ->
-  Γ ⟹ A <->
-  Γ ⟹ B.
-Proof.
-  move => HAB. split; move => H.
-  * by rewrite -HAB.
-  * by rewrite HAB.
-Qed.
+Lemma eqderiv_Forall {A} (f g : A -> form):
+  (∀ x, f x ⟺ g x) ->
+  ∀ l, Forall (λ x, f x ⟺ g x) l.
+Admitted.
 
-Lemma eqderiv_hyp {A B C Γ} :
-  A ⟺ B ->
-  A :: Γ ⟹ C <->
-  B :: Γ ⟹ C.
-Proof.
-  move => HAB. split; move => H.
-  * Fail by rewrite -HAB.
-    by apply (proper_deriv_hyp _ _ _ _ HAB).
-  * Fail by rewrite HAB.
-    by apply (proper_deriv_hyp _ _ _ _ HAB).
-Qed.
+Lemma eqderiv_map {A} (f g : A -> form) :
+  (∀ x, f x ⟺ g x) ->
+  ∀ l, Forall2 eqderiv (f <$> l) (g <$> l).
+Admitted.
 
 (** * Some useful tautologies *)
 
@@ -309,4 +296,12 @@ Lemma and_assoc A B C :
   A ∧ B ∧ C ⟺ (A ∧ B) ∧ C.
 Proof.
   split; isearch.
+Qed.
+
+Lemma And_app Γ Δ :
+  ⋀ (Γ ++ Δ) ⟺ ⋀ Γ ∧ ⋀ Δ.
+Proof.
+  rewrite /And foldr_app -/And.
+  elim: Γ => [|A Γ IH] //=. split; isearch.
+  rewrite IH. split; isearch.
 Qed.
