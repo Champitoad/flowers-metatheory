@@ -259,6 +259,5 @@ Proof.
   clear x y.
   * apply S_ax.
   * apply local_soundness in Hstep.
-    pose Hcut := (S_cut _ _ _ _ IH Hstep).
-    done.
+    pcut ⌊Δ⌋; auto. by pweak 1.
 Qed.

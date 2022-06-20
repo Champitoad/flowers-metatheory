@@ -45,9 +45,9 @@ Inductive deriv : list form -> form -> Prop :=
 | S_ax A Γ :
   A :: Γ ⟹ A
 
-| S_cut A Γ Δ C :
-  Γ ⟹ A -> A :: Δ ⟹ C ->
-  Γ ++ Δ ⟹ C
+| S_cut A Γ C :
+  Γ ⟹ A -> A :: Γ ⟹ C ->
+  Γ ⟹ C
 
 (** ** Right rules *)
 
@@ -185,10 +185,9 @@ Lemma weakening A Γ C :
 Proof.
   elim.
   * move => B Γ'. isearch.
-  * move: C => _ B Γ' Δ C Hr Hr' Hl Hl'.
-    have Hl'' : B :: A :: Δ ⟹ C. { by permute A. }
-    pose proof (H := S_cut B _ _ _ Hr Hl'').
-    apply (S_perm (Γ' ++ A :: Δ)); auto. solve_Permutation.
+  * move: C => _ B Γ' C Hr Hr' Hl Hl'.
+    have Hl'' : B :: A :: Γ' ⟹ C. { by permute A. }
+    by apply (S_cut B).
   * move => Γ'. isearch.
   * move => D B Γ' *. isearch.
   * move => D B Γ' *. by apply S_R_or_l.
@@ -206,17 +205,7 @@ Qed.
 Ltac pweak i :=
   permuti i; apply weakening.
 
-Lemma contraction A Γ C :
-  A :: A :: Γ ⟹ C ->
-  A :: Γ ⟹ C.
-Proof.
-Admitted.
-
-Lemma additive_cut : ∀ (A : form) (Γ : list form) (C : form),
-  Γ ⟹ A → A :: Γ ⟹ C → Γ ⟹ C.
-Admitted.
-
-Ltac pcut A := apply (additive_cut A).
+Ltac pcut A := apply (S_cut A).
 
 (** * Generalized rewriting of equiderivable formulas *)
 
@@ -231,8 +220,8 @@ Proof.
   * move => A. split; apply S_ax.
   * move => A B [HAB HBA]; done.
   * move => A B C [HAB HBA] [HBC HCB]. split.
-    - apply (S_cut _ _ _ _ HAB HBC).
-    - apply (S_cut _ _ _ _ HCB HBA).
+    pcut B; auto. by pweak 1.
+    pcut B; auto. by pweak 1.
 Qed.
 
 #[export] Instance : Equiv form := eqderiv.
