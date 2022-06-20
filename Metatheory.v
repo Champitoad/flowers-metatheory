@@ -240,15 +240,8 @@ Proof.
 
   (* Pollination *)
 
-  * move => F G i.
-    have Heqr : (⌊⋅[F; G]⌋) ⟺ (⌊F⌋ ∧ ⌊G⌋).
-    { simpl. rewrite true_unit true_unit. reflexivity. }
-    rewrite interp_juxt Heqr. by apply wind_pollination.
-
-  * move => F G i.
-    have Heqr : (⌊⋅[F; G]⌋) ⟺ (⌊F⌋ ∧ ⌊G⌋).
-    { simpl. rewrite true_unit true_unit. reflexivity. }
-    rewrite interp_juxt Heqr. by apply wind_pollination.
+  * move => F G i. rewrite interp_juxt interp_juxt. by apply wind_pollination.
+  * move => F G i. rewrite interp_juxt interp_juxt. by apply wind_pollination.
 
   (* Reproduction *)
   (* Decomposition *)

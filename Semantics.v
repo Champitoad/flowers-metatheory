@@ -112,21 +112,19 @@ Ltac permuti i :=
       permute X
   end.
 
-Lemma weakening A Γ C :
-  Γ ⟹ C ->
-  A :: Γ ⟹ C.
-Admitted.
-
 (** * Basic proof search *)
 
 Ltac passum :=
   match goal with
-  | |- ?A :: _ ⟹ ?A => by apply S_ax
-  | |- _ :: _ ⟹ _ => try apply weakening; passum
+  | |- ?Γ ⟹ ?C =>
+      let len := eval compute in (length Γ) in
+      let rec aux n :=
+        match n with
+        | S ?m => (apply S_ax) || (permuti (len - m); aux m)
+        end
+      in 
+      aux len
   end.
-
-Ltac pweak i :=
-  permuti i; apply weakening.
 
 Ltac pintroL i :=
   match goal with
@@ -178,6 +176,18 @@ Ltac isearch :=
       in let n := eval compute in (length Γ) in
       introΓ n
   end.
+
+Lemma weakening A Γ C :
+  Γ ⟹ C ->
+  A :: Γ ⟹ C.
+Proof.
+  elim.
+  * move => B Γ'. permute B. econs.
+  * move: C => _ B Γ' Δ C. intros.
+Admitted.
+
+Ltac pweak i :=
+  permuti i; apply weakening.
 
 Lemma additive_cut : ∀ (A : form) (Γ : list form) (C : form),
   Γ ⟹ A → A :: Γ ⟹ C → Γ ⟹ C.
