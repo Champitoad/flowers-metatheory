@@ -168,7 +168,7 @@ Ltac pintroR :=
 Ltac isearch :=
   match goal with
   | |- ?Γ ⟹ _ =>
-      passum ||
+      done || passum ||
       tryif pintroR then isearch else
       let rec introΓ n :=
         match n with
@@ -184,17 +184,33 @@ Lemma weakening A Γ C :
   A :: Γ ⟹ C.
 Proof.
   elim.
-  * move => B Γ'. passum.
+  * move => B Γ'. isearch.
   * move: C => _ B Γ' Δ C Hr Hr' Hl Hl'.
     have Hl'' : B :: A :: Δ ⟹ C. { by permute A. }
     pose proof (H := S_cut B _ _ _ Hr Hl'').
-    have Hperm : Γ' ++ A :: Δ ≡ₚ A :: Γ' ++ Δ. { solve_Permutation. }
-    by apply (S_perm _ _ _ Hperm).
-  * admit. 
-Admitted.
+    apply (S_perm (Γ' ++ A :: Δ)); auto. solve_Permutation.
+  * move => Γ'. isearch.
+  * move => D B Γ' *. isearch.
+  * move => D B Γ' *. by apply S_R_or_l.
+  * move => D B Γ' *. by apply S_R_or_r.
+  * move => D B Γ' *. pintroR. by permute A.
+  * move => D B Γ' *. by pintroL 1.
+  * move => Γ' D. by pintroL 1.
+  * move => D B Γ' E *. pintroL 1.
+    apply (S_perm (A :: D :: B :: Γ')); auto. solve_Permutation.
+  * move => D B Γ' E *. pintroL 1; by permuti 1.
+  * move => D B Γ' E *. pimpL 1; auto. by permuti 1.
+  * move => Δ Δ' D *. apply (S_perm (A :: Δ)); auto.
+Qed.
 
 Ltac pweak i :=
   permuti i; apply weakening.
+
+Lemma contraction A Γ C :
+  A :: A :: Γ ⟹ C ->
+  A :: Γ ⟹ C.
+Proof.
+Admitted.
 
 Lemma additive_cut : ∀ (A : form) (Γ : list form) (C : form),
   Γ ⟹ A → A :: Γ ⟹ C → Γ ⟹ C.
