@@ -117,13 +117,15 @@ Ltac permuti i :=
 Ltac passum :=
   match goal with
   | |- ?Γ ⟹ ?C =>
-      let len := eval compute in (length Γ) in
-      let rec aux n :=
-        match n with
-        | S ?m => (apply S_ax) || (permuti (len - m); aux m)
+      let rec aux Δ n :=
+        match Δ with
+        | ?C :: ?Δ => apply S_ax
+        | _ :: ?Δ =>
+            let i := constr:(S n) in
+            permuti i; aux Δ i
         end
       in 
-      aux len
+      aux Γ 0
   end.
 
 Ltac pintroL i :=
@@ -182,8 +184,13 @@ Lemma weakening A Γ C :
   A :: Γ ⟹ C.
 Proof.
   elim.
-  * move => B Γ'. permute B. econs.
-  * move: C => _ B Γ' Δ C. intros.
+  * move => B Γ'. passum.
+  * move: C => _ B Γ' Δ C Hr Hr' Hl Hl'.
+    have Hl'' : B :: A :: Δ ⟹ C. { by permute A. }
+    pose proof (H := S_cut B _ _ _ Hr Hl'').
+    have Hperm : Γ' ++ A :: Δ ≡ₚ A :: Γ' ++ Δ. { solve_Permutation. }
+    by apply (S_perm _ _ _ Hperm).
+  * admit. 
 Admitted.
 
 Ltac pweak i :=
