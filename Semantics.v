@@ -100,6 +100,8 @@ Inductive deriv : list form -> form -> Prop :=
 
 where "Γ ⟹ C" := (deriv Γ C).
 
+(** * Basic proof search *)
+
 Ltac permute A :=
   match goal with
   | |- _ ⟹ _ => eapply (S_perm (A :: _) _ _); [> econs; try solve_Permutation | ..]
@@ -111,8 +113,6 @@ Ltac permuti i :=
       let X := eval simpl in (nth i Γ ⊤) in
       permute X
   end.
-
-(** * Basic proof search *)
 
 Ltac passum :=
   match goal with
@@ -165,31 +165,36 @@ Ltac pintroR :=
       in apply rule
   end.
 
-Ltac isearch :=
+Ltac isrch :=
   match goal with
   | |- ?Γ ⟹ _ =>
       done || passum ||
-      tryif pintroR then isearch else
+      tryif pintroR then isrch else
       let rec introΓ n :=
         match n with
         | 0 => idtac
-        | S ?m => tryif pintroL m then isearch else introΓ m
+        | S ?m => tryif pintroL m then isrch else introΓ m
         end
       in let n := eval compute in (length Γ) in
       introΓ n
   end.
+
+Ltac eqd := split; isrch.
+
+Ltac pleft := apply S_R_or_l; isrch.
+Ltac pright := apply S_R_or_r; isrch.
 
 Lemma weakening A Γ C :
   Γ ⟹ C ->
   A :: Γ ⟹ C.
 Proof.
   elim.
-  * move => B Γ'. isearch.
+  * move => B Γ'. isrch.
   * move: C => _ B Γ' C Hr Hr' Hl Hl'.
     have Hl'' : B :: A :: Γ' ⟹ C. { by permute A. }
     by apply (S_cut B).
-  * move => Γ'. isearch.
-  * move => D B Γ' *. isearch.
+  * move => Γ'. isrch.
+  * move => D B Γ' *. isrch.
   * move => D B Γ' *. by apply S_R_or_l.
   * move => D B Γ' *. by apply S_R_or_r.
   * move => D B Γ' *. pintroR. by permute A.
@@ -232,8 +237,8 @@ Add Morphism FAnd with signature
 Proof.
   move => A B [HAB HBA] C D [HCD HDC].
   split.
-  * isearch. by pweak 1. by pweak 0.
-  * isearch. by pweak 1. by pweak 0. 
+  * isrch. by pweak 1. by pweak 0.
+  * isrch. by pweak 1. by pweak 0. 
 Qed.
 
 Add Morphism FOr with signature
@@ -242,10 +247,10 @@ Add Morphism FOr with signature
 Proof.
   move => A B [HAB HBA] C D [HCD HDC].
   split.
-  * isearch.
+  * isrch.
     by apply S_R_or_l.
     by apply S_R_or_r.
-  * isearch.
+  * isrch.
     by apply S_R_or_l.
     by apply S_R_or_r.
 Qed.
@@ -256,8 +261,8 @@ Add Morphism FImp with signature
 Proof.
   move => A B [HAB HBA] C D [HCD HDC].
   split.
-  * isearch. pimpL 1. exact. by pweak 1.
-  * isearch. pimpL 1. exact. by pweak 1.
+  * isrch. pimpL 1. exact. by pweak 1.
+  * isrch. pimpL 1. exact. by pweak 1.
 Qed.
 
 Add Morphism And with signature
@@ -265,8 +270,8 @@ Add Morphism And with signature
   as proper_And.
 Proof.
   elim => [|A As IHA] //=.
-  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isearch.
-  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isearch.
+  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
+  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
     - pweak 1. apply H.
     - pweak 0. by apply IHA.
     - pweak 1. apply H.
@@ -278,52 +283,251 @@ Add Morphism Or with signature
   as proper_Or.
 Proof.
   elim => [|A As IHA] //=.
-  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isearch.
-  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isearch.
+  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
+  * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
     - apply S_R_or_l. apply H.
     - apply S_R_or_r. by apply IHA.
     - apply S_R_or_l. apply H.
     - apply S_R_or_r. by apply IHA.
 Qed.
 
-Add Parametric Morphism Γ C : (λ A, deriv (A :: Γ) C) with signature
-  eqderiv ==> iff
-  as proper_deriv_hyp.
-Admitted.
+Lemma proper_cons_left_deriv A B Γ C :
+  A ⟺ B -> 
+  A :: Γ ⟹ C <-> B :: Γ ⟹ C.
+Proof.
+  move => [HAB HBA]. split.
+  * move => HA.
+    have HBA' : B :: Γ ⟹ A. { elim Γ => [|D Γ' IH]; auto. by pweak 1. } 
+    have HA' : A :: B :: Γ ⟹ C. { by pweak 1. }
+    by pcut A.
+  * move => HB.
+    have HAB' : A :: Γ ⟹ B. { elim Γ => [|D Γ' IH]; auto. by pweak 1. } 
+    have HB' : B :: A :: Γ ⟹ C. { by pweak 1. }
+    by pcut B.
+Qed.
+
+Lemma proper_app_deriv : ∀ Γ Γ' Δ C,
+  Forall2 eqderiv Γ Γ' ->
+  Δ ++ Γ ⟹ C <-> Δ ++ Γ' ⟹ C.
+Proof.
+  induction Γ, Γ'; move => Δ C Heq; try inv Heq; auto.
+  move: a f H2 H4 => B B' HB HΓ.
+  split; move => H.
+  * specialize (IHΓ Γ' (B :: Δ) C HΓ).
+    list_simplifier.
+    have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
+    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. }
+    apply (S_perm _ _ _ Hperm2). 
+    rewrite -(proper_cons_left_deriv _ _ _ _ HB).
+    have H' : B :: Δ ++ Γ ⟹ C. { by apply (S_perm _ _ _ Hperm1). }
+    by apply IHΓ.
+  * specialize (IHΓ Γ' (B' :: Δ) C HΓ).
+    list_simplifier.
+    have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
+    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. }
+    symmetry in Hperm1. apply (S_perm _ _ _ Hperm1). 
+    rewrite (proper_cons_left_deriv _ _ _ _ HB).
+    have H' : B' :: Δ ++ Γ' ⟹ C. { symmetry in Hperm2. by apply (S_perm _ _ _ Hperm2). }
+    by apply IHΓ.
+Qed.
 
 Add Parametric Morphism : deriv with signature
   Forall2 eqderiv ==> eqderiv ==> iff
   as proper_deriv_concl.
-Admitted.
+Proof.
+  move => Γ Δ HΓΔ C D [HCD HDC].
+  move: Γ Δ HΓΔ.
+  induction Γ, Δ; intros; try inv HΓΔ.
+  * split; move => H. by pcut C. by pcut D.
+  * move: a f H2 H4 => E F HEF HΓΔ.
+    pose proof (H := IHΓ _ HΓΔ); case: H => [H1 H2].
+    split; move => H.
+    - pcut C.
+      { apply (proper_cons_left_deriv E F); auto.
+        apply (proper_app_deriv Γ Δ [E]); auto. }
+      pweak 1. elim Δ => [|? ? ?]; auto. by pweak 1.
+    - pcut D.
+      { apply (proper_cons_left_deriv E F); auto.
+        apply (proper_app_deriv Δ Γ [F]); auto.
+        by symmetry in HΓΔ. }
+      pweak 1. elim Γ => [|? ? ?]; auto. by pweak 1.
+Qed.
 
 Lemma eqderiv_Forall {A} (f g : A -> form):
   (∀ x, f x ⟺ g x) ->
   ∀ l, Forall (λ x, f x ⟺ g x) l.
-Admitted.
+Proof.
+  move => H. elim => [|x l IH] //=. econs.
+Qed.
 
 Lemma eqderiv_map {A} (f g : A -> form) :
   (∀ x, f x ⟺ g x) ->
   ∀ l, Forall2 eqderiv (f <$> l) (g <$> l).
-Admitted.
+Proof.
+  move => H. elim => [|x l IH] //=. econs.
+Qed.
 
 (** * Some useful tautologies *)
+
+Section Tautos.
+
+#[local] Ltac L := pleft.
+#[local] Ltac R := pright.
+
+Lemma true_and A :
+  A ∧ ⊤ ⟺ A.
+Proof.
+  split; isrch.
+Qed.
+
+Lemma true_or A :
+  A ∨ ⊤ ⟺ ⊤.
+Proof.
+  eqd. R.
+Qed.
+
+Lemma false_and A :
+  A ∧ ⊥ ⟺ ⊥.
+Proof.
+  eqd.
+Qed.
+
+Lemma false_or A :
+  A ∨ ⊥ ⟺ A.
+Proof.
+  eqd. L.
+Qed.
 
 Lemma and_comm A B :
   A ∧ B ⟺ B ∧ A.
 Proof.
-  split; isearch.
+  eqd.
 Qed.
 
 Lemma and_assoc A B C :
   A ∧ B ∧ C ⟺ (A ∧ B) ∧ C.
 Proof.
-  split; isearch.
+  eqd.
+Qed.
+
+Lemma or_comm A B :
+  A ∨ B ⟺ B ∨ A.
+Proof.
+  eqd. R. L. R. L.
+Qed.
+
+Lemma or_assoc A B C :
+  A ∨ B ∨ C ⟺ (A ∨ B) ∨ C.
+Proof.
+  eqd. L; L. L; R. R. L. R; L. R; R.
 Qed.
 
 Lemma And_app Γ Δ :
   ⋀ (Γ ++ Δ) ⟺ ⋀ Γ ∧ ⋀ Δ.
 Proof.
   rewrite /And foldr_app -/And.
-  elim: Γ => [|A Γ IH] //=. split; isearch.
-  rewrite IH. split; isearch.
+  elim: Γ => [|A Γ IH] //=. eqd.
+  rewrite IH. eqd.
 Qed.
+
+Lemma Or_app Γ Δ :
+  ⋁ (Γ ++ Δ) ⟺ ⋁ Γ ∨ ⋁ Δ.
+Proof.
+  rewrite /Or foldr_app -/Or.
+  elim: Γ => [|A Γ IH] //=. eqd. R.
+  rewrite IH. eqd.
+  L; L. L; R. R. L; L. R; L. R; R.
+Qed.
+
+Lemma And_singl A :
+  ⋀ [A] ⟺ A.
+Proof.
+  rewrite /= true_and. reflexivity.
+Qed.
+
+Lemma Or_singl A :
+  ⋁ [A] ⟺ A.
+Proof.
+  rewrite /= false_or. reflexivity.
+Qed.
+
+Lemma currying A B C :
+  A ∧ B ⊃ C ⟺ A ⊃ B ⊃ C.
+Proof.
+  eqd.
+  permuti 2. Unshelve. 4: exact [B; A]. solve_Permutation. pimpL 0; isrch.
+  permuti 2. Unshelve. 3: exact [B; A]. solve_Permutation. pimpL 0; isrch. pimpL 0; isrch.
+Qed.
+
+Lemma and_or_distr A B C :
+  A ∧ (B ∨ C) ⟺ A ∧ B ∨ A ∧ C.
+Proof.
+  eqd. L. R. L. R.
+Qed.
+
+Lemma wpol_imp_l A B C :
+  A ∧ (B ⊃ C) ⟺ A ∧ (A ∧ B ⊃ C).
+Proof.
+  eqd.
+  pimpL 1; isrch.
+  pimpL 1; isrch.
+Qed.
+
+Lemma wpol_imp_r A B C :
+  A ∧ (B ⊃ C) ⟺ A ∧ (B ⊃ A ∧ C).
+Proof.
+  eqd.
+  pimpL 1; isrch.
+  pimpL 1; isrch.
+Qed.
+
+Lemma wpol_And A : ∀ Γ,
+  A ∧ ⋀ Γ ⟺ A ∧ ⋀ ((λ B, A ∧ B) <$> Γ).
+Proof.
+  elim => [|C Γ [IHl IHr]] //=.
+  * eqd.
+  * rewrite [A ∧ _]and_assoc [A ∧ _]and_comm -[_ ∧ ⋀ Γ]and_assoc.
+    rewrite [A ∧ (C ∧ _) ∧ _]and_assoc [A ∧ C ∧ _]and_assoc -[((A ∧ C) ∧ _) ∧ _]and_assoc.
+    split.
+    - pintroR. isrch.
+      pintroL 0. by pweak 0.
+    - pintroR. pintroL 0. pintroL 0. pweak 0. passum.
+      pintroL 0. by pweak 0.
+Qed.
+
+Lemma wpol_Or {T} A (f : T -> form) : ∀ Γ,
+  A ∧ ⋁ (f <$> Γ) ⟺ A ∧ ⋁ ((λ B, A ∧ f B) <$> Γ).
+Proof.
+  elim => [|C Γ [IHl IHr]]; split; list_simplifier; isrch.
+  * apply S_R_or_l; isrch.
+  * apply S_R_or_r.
+    pcut (A ∧ ⋁ (f <$> Γ)). isrch.
+    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). pweak 1. by pweak 1.
+    pintroL 0. cbv; passum.
+  * apply S_R_or_l; isrch.
+  * apply S_R_or_r.
+    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). cbv; isrch.
+    pweak 1. pweak 1.
+    pcut (A ∧ ⋁ (f <$> Γ)). assumption.
+    pweak 1. isrch.
+Qed.
+
+Lemma spol_r A B :
+  A ⊃ B ⟺ A ⊃ A ∧ B.
+Proof.
+  eqd.
+  pimpL 1; isrch.
+  pimpL 1; isrch.
+Qed.
+
+Lemma and_intro_r_msucc A B C D :
+  A ⊃ B ∧ C ∨ D ⟺ (A ⊃ B ∨ D) ∧ (A ⊃ C ∨ D).
+Proof.
+  eqd.
+  pimpL 1; isrch. L. R.
+  pimpL 1; isrch. L. R.
+  pimpL 0; isrch. pimpL 1; isrch. L. R.
+  pimpL 1; isrch. R. R.
+Qed.
+
+End Tautos.

@@ -1,6 +1,6 @@
 Require Import ssreflect.
-Require Import stdpp.list stdpp.relations.
 Require Import String.
+Require Import stdpp.list stdpp.relations.
 
 (** Names *)
 
@@ -119,23 +119,32 @@ Definition lequiv {A} (R : relation A) : relation (list A) :=
 Infix "≡ₗ@{ R }" :=
   (lequiv R) (at level 70, no associativity, only parsing).
 
-Lemma equiv_Forall {A} (P Q : A -> Prop) (l : list A) :
+Lemma equiv_Forall {A} (P Q : A -> Prop) : ∀ (l : list A),
   (∀ x, P x <-> Q x) ->
   Forall P l <-> Forall Q l.
 Proof.
-Admitted.
+  elim => [|x l IH H] //=.
+  split; move => Hl; inv Hl; firstorder.
+Qed.
 
-Instance Forall2_Equivalence {A} (e : Equiv A) : Equivalence (Forall2 e).
+#[export] Instance Forall2_Equivalence {A} (e : relation A) {_ : Equivalence e} :
+  Equivalence (Forall2 e).
 Proof.
-Admitted.
+  econs; repeat red.
+  * elim; intros; auto. econs. apply Equivalence_Reflexive.
+  * move => l l'; move: l l'; induction l, l'; move => He; try inv He; auto. econs.
+    by apply Equivalence_Symmetric.
+  * induction x, y, z; move => H1 H2; try (inv H1; inv H2). econs. 
+    by apply (Equivalence_Transitive _ _ _ H5 H4).
+Qed.
 
 Lemma Forall_equiv_map {A B} {e : Equiv B} (l : list A) (f g : A -> B) :
   (Forall (fun x => e (f x) (g x)) l) <->
   Forall2 e (f <$> l) (g <$> l).
 Proof.
   split.
-  * elim: l => [H |a l IHl H]; try done.
-    decompose_Forall_hyps. econs.
+  * elim: l => [H |a l IHl H]; try done;
+    decompose_Forall_hyps; econs.
   * elim: l => [H |a l IHl H]; try done.
     rewrite [f <$> _]fmap_cons [g <$> _]fmap_cons in H.
     inv H. econs.
@@ -145,7 +154,9 @@ Lemma Forall2_Forall2_Proper {A} {e : Equiv A} :
   ∀ (f : list A -> A) {Hp : Proper (Forall2 e ==> e) f} (l l' : list (list A)),
   Forall2 (Forall2 e) l l' ->
   Forall2 e (f <$> l) (f <$> l').
-Admitted.
+Proof.
+  move => f Hp. induction l, l'; move => H; try inv H; econs.
+Qed.
 
 Lemma Forall2_eq_eq {A} : forall (l l' : list A),
   Forall2 eq l l' <-> l = l'.

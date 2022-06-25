@@ -40,16 +40,10 @@ Open Scope garden_scope.
 
 (** * Soundness *)
 
-Lemma true_unit A :
-  A ∧ ⊤ ⟺ A.
-Proof.
-  split; isearch.
-Qed.
-
 Lemma flower_garden F :
   ⌊F⌋%flower ⟺ ⌊F⌋%garden.
 Proof.
-  simpl. rewrite true_unit. reflexivity.
+  simpl. rewrite true_and. reflexivity.
 Qed.
 
 Lemma flower_flowers Fs :
@@ -90,65 +84,18 @@ Lemma interp_flower_flowers Γ Π :
 Proof.
   case: Γ => Fs //=.
   rewrite flower_flowers garden_gardens gardens_flowers.
-  rewrite true_unit. reflexivity.
+  rewrite true_and. reflexivity.
 Qed.
 
-Lemma iteration_imp_l A B C :
-  A ∧ (B ⊃ C) ⟺ A ∧ (A ∧ B ⊃ C).
-Proof.
-  split; isearch.
-  pimpL 1; isearch.
-  pimpL 1; isearch.
-Qed.
-
-Lemma iteration_imp_r A B C :
-  A ∧ (B ⊃ C) ⟺ A ∧ (B ⊃ A ∧ C).
-Proof.
-  split; isearch.
-  pimpL 1; isearch.
-  pimpL 1; isearch.
-Qed.
-
-Lemma iteration_And A : ∀ Γ,
-  A ∧ ⋀ Γ ⟺ A ∧ ⋀ ((λ B, A ∧ B) <$> Γ).
-Proof.
-  elim => [|C Γ [IHl IHr]] //=.
-  * split; isearch.
-  * rewrite [A ∧ _]and_assoc [A ∧ _]and_comm -[_ ∧ ⋀ Γ]and_assoc.
-    rewrite [A ∧ (C ∧ _) ∧ _]and_assoc [A ∧ C ∧ _]and_assoc -[((A ∧ C) ∧ _) ∧ _]and_assoc.
-    split.
-    - pintroR. isearch.
-      pintroL 0. by pweak 0.
-    - pintroR. pintroL 0. pintroL 0. pweak 0. passum.
-      pintroL 0. by pweak 0.
-Qed.
-
-Lemma iteration_Or {T} A (f : T -> form) : ∀ Γ,
-  A ∧ ⋁ (f <$> Γ) ⟺ A ∧ ⋁ ((λ B, A ∧ f B) <$> Γ).
-Proof.
-  elim => [|C Γ [IHl IHr]]; split; list_simplifier; isearch.
-  * apply S_R_or_l; isearch.
-  * apply S_R_or_r.
-    pcut (A ∧ ⋁ (f <$> Γ)). isearch.
-    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). pweak 1. by pweak 1.
-    pintroL 0. cbv; passum.
-  * apply S_R_or_l; isearch.
-  * apply S_R_or_r.
-    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). cbv; isearch.
-    pweak 1. pweak 1.
-    pcut (A ∧ ⋁ (f <$> Γ)). assumption.
-    pweak 1. isearch.
-Qed.
-
-Lemma iteration_wind_flower (A : form) (f : flower -> form) (Γ : garden) (Π : list garden) :
+Lemma wpol_flower (A : form) (f : flower -> form) (Γ : garden) (Π : list garden) :
   A ∧ (⋀ (fmf f Γ) ⊃ ⋁ (fmg (λ Δ, ⋀ (fmf f Δ)) Π)) ⟺
   A ∧ (⋀ (fmf (λ x, A ∧ f x) Γ) ⊃ ⋁ (fmg (λ Δ, ⋀ (fmf (λ x, A ∧ f x) Δ)) Π)).
 Proof.
-  rewrite iteration_imp_l iteration_imp_r iteration_And iteration_Or.
+  rewrite wpol_imp_l wpol_imp_r wpol_And wpol_Or.
   rewrite /fmf/fmg -list_fmap_compose /compose.
   rewrite (eqderiv_map _ (λ Δ : garden, A ∧ ⋀ ((λ x : flower, A ∧ f x) <$> (gl Δ))) _ Π).
-  { move => Δ. rewrite iteration_And -list_fmap_compose /compose. reflexivity. }
-  rewrite -iteration_Or -iteration_imp_r -iteration_imp_l.
+  { move => Δ. rewrite wpol_And -list_fmap_compose /compose. reflexivity. }
+  rewrite -wpol_Or -wpol_imp_r -wpol_imp_l.
   reflexivity.
 Qed.
 
@@ -176,21 +123,29 @@ Lemma flowers_fill s : ∀ Γ,
   ⋀ (flowers_to_form (s @ Γ)) ⟺
   ⋀ (fmf (λ G, ⌊s @ G⌋) Γ).
 Proof.
-  case => Fs. elim: Fs => [|F Fs IH] //. split; simpl; isearch.
+  case => Fs. elim: Fs => [|F Fs IH] //. split; simpl; isrch.
   rewrite fill_cons flowers_juxt /fmf fmap_cons -/fmf.
   rewrite cons_app And_app And_app IH.
-  rewrite [⋀ [⌊s @ F⌋]]/foldr true_unit.
+  rewrite [⋀ [⌊s @ F⌋]]/foldr true_and.
   have H : ⌊s @ F⌋ ⟺ ⋀ (flowers_to_form (s @ F)).
   { simpl. list_simplifier. rewrite flower_flowers. reflexivity. }
   rewrite H. reflexivity.
 Qed.
 
-Lemma wind_pollination (F : flower) i : ∀ (G : flower),
-  ⌊F⌋ ∧ ⌊i ≔ F @ G⌋ ⟺ ⌊F⌋ ∧ ⌊G⌋.
+Lemma interp_juxt Γ Δ :
+  ⌊Γ ∪ Δ⌋ ⟺ ⌊Γ⌋ ∧ ⌊Δ⌋.
 Proof.
-  elim/flower_induction => [j |a |Γ Π IHΓ IHΠ].
-  - move =>/=. case (j =? i)%nat =>/=; split; isearch. 
-  - move =>/=. split; isearch.
+  rewrite garden_flowers flowers_juxt And_app -garden_flowers -garden_flowers.
+  reflexivity.
+Qed.
+
+Lemma wind_pollination (F : flower) i (G : flower) :
+  ⌊F ∪ i ≔ F @ G⌋ ⟺ ⌊F ∪ G⌋.
+Proof.
+  rewrite interp_juxt interp_juxt.
+  elim/flower_induction: G => [j |a |Γ Π IHΓ IHΠ].
+  - move =>/=. case (j =? i)%nat =>/=; eqd. 
+  - move =>/=. eqd.
   - have IH : ⌊F⌋ ∧
              (⋀ (fmf (λ G : flower, ⌊F⌋ ∧ ⌊i ≔ F @ G⌋) (gl Γ))
                 ⊃ ⋁ (fmg (λ Δ, ⋀ (fmf (λ G, ⌊F⌋ ∧ ⌊i ≔ F @ G⌋) (gl Δ))) Π))
@@ -221,15 +176,48 @@ Proof.
     { move => Δ. rewrite flowers_fill. reflexivity. }
     rewrite -/fmg. 
     rewrite interp_flower_flowers /flowers_to_form.
-    rewrite (iteration_wind_flower _ (λ G, ⌊G⌋)) iteration_wind_flower.
+    rewrite (wpol_flower _ (λ G, ⌊G⌋)) wpol_flower.
     exact IH.
 Qed.
 
-Lemma interp_juxt Γ Δ :
-  ⌊Γ ∪ Δ⌋ ⟺ ⌊Γ⌋ ∧ ⌊Δ⌋.
+Lemma split_petal Γ Δ₁ Δ₂ Π :
+  ⌊Γ ⊢ Δ₁ ∪ Δ₂ :: Π⌋ ⟺ ⌊Γ ⊢ Δ₁ :: Π⌋ ∧ ⌊Γ ⊢ Δ₂ :: Π⌋.
 Proof.
-  rewrite garden_flowers flowers_juxt And_app -garden_flowers -garden_flowers.
-  reflexivity.
+  repeat rewrite interp_flower_flowers -garden_flowers.
+  repeat rewrite /fmg fmap_cons.
+  repeat rewrite flowers_juxt And_app.
+  repeat rewrite -garden_flowers.
+  rewrite (cons_app (⌊Δ₁⌋ ∧ ⌊Δ₂⌋)) (cons_app ⌊Δ₁⌋) (cons_app ⌊Δ₂⌋).
+  repeat rewrite Or_app Or_singl.
+  by apply and_intro_r_msucc.
+Qed.
+
+Lemma self_pollination (F : flower) i (Γ Δ : garden) (Π : list garden) :
+  ⌊F ∪ Γ ⊢ Δ :: Π⌋ ⟺ ⌊F ∪ Γ ⊢ i ≔ F @ Δ :: Π⌋.
+Proof.
+  elim/garden_induction: Δ.
+  - move => j //=. list_simplifier.
+    case (j =? i)%nat =>/=; eqd; elim Γ => Fs; apply S_R_or_l; isrch.
+  - move => a //=. eqd.
+  - move => Δ Π' H IH.
+    repeat rewrite interp_flower_flowers flowers_juxt And_app.
+    repeat rewrite -garden_flowers.
+    repeat rewrite /fmg fmap_cons.
+    rewrite cons_app; symmetry; rewrite cons_app; symmetry.
+    repeat rewrite Or_app.
+    repeat rewrite -garden_flowers Or_singl.
+    rewrite [⌊F⌋ ∧ _]and_comm currying currying.
+    rewrite [⌊F⌋ ⊃ _]spol_r [_ ⊃ ⌊_ @ _⌋ ∨ _]spol_r.
+    repeat rewrite and_or_distr -interp_juxt.
+    rewrite wind_pollination.
+    by reflexivity.
+  - eqd.
+  - move => G Gs H IH.
+    rewrite (cons_app G) fill_cons -/(juxt (⋅[G]) (⋅Gs)).
+    rewrite split_petal.
+    rewrite H IH.
+    rewrite -split_petal.
+    reflexivity.
 Qed.
 
 Lemma local_soundness : ∀ (Γ Δ : garden),
@@ -240,8 +228,10 @@ Proof.
 
   (* Pollination *)
 
-  * move => F G i. rewrite interp_juxt interp_juxt. by apply wind_pollination.
-  * move => F G i. rewrite interp_juxt interp_juxt. by apply wind_pollination.
+  * intros. by apply wind_pollination.
+  * intros. by apply wind_pollination.
+  * intros. by apply self_pollination.
+  * intros. by apply self_pollination.
 
   (* Reproduction *)
   (* Decomposition *)
