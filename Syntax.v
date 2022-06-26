@@ -248,7 +248,7 @@ Inductive step : garden -> garden -> Prop :=
 
 | R_rep (Γ : garden) (Δs Π : list garden) :
   (⊢ Δs) ∪ Γ ⊢ Π ~>
-  Γ ⊢ (fun Δ => ⋅ [Δ ⊢ Π]) <$> Δs
+  Γ ⊢ [⋅ (λ Δ, Δ ⊢ Π) <$> Δs]
 
 (** ** Decomposition *)
 

@@ -386,6 +386,12 @@ Proof.
   eqd. R.
 Qed.
 
+Lemma true_imp_l A :
+  ⊤ ⊃ A ⟺ A.
+Proof.
+  eqd. pimpL 0; isrch.
+Qed.
+
 Lemma false_and A :
   A ∧ ⊥ ⟺ ⊥.
 Proof.
@@ -465,6 +471,27 @@ Proof.
   eqd. L. R. L. R.
 Qed.
 
+Lemma or_imp_distr A B C :
+  (A ∨ B) ⊃ C ⟺ (A ⊃ C) ∧ (B ⊃ C).
+Proof.
+  eqd.
+  pimpL 1; isrch. L.
+  pimpL 1; isrch. R.
+  permuti 2. Unshelve. 3: exact [A ⊃ C; B ⊃ C]. solve_Permutation.
+  pintroL 0. pimpL 1; isrch.
+  pweak 1. pimpL 1; isrch.
+Qed.
+
+Lemma imp_and_distr A B C :
+  A ⊃ B ∧ C ⟺ (A ⊃ B) ∧ (A ⊃ C).
+Proof.
+  eqd.
+  pimpL 1; isrch.
+  pimpL 1; isrch.
+  pimpL 0; isrch.
+  pimpL 1; isrch.
+Qed.
+
 Lemma wpol_imp_l A B C :
   A ∧ (B ⊃ C) ⟺ A ∧ (A ∧ B ⊃ C).
 Proof.
@@ -528,6 +555,37 @@ Proof.
   pimpL 1; isrch. L. R.
   pimpL 0; isrch. pimpL 1; isrch. L. R.
   pimpL 1; isrch. R. R.
+Qed.
+
+Lemma or_intro_l_nary {T} (f : T -> form) : ∀ l (A B : form),
+  A ⊃ ⋀ ((λ x, f x ⊃ B) <$> l) ⟺
+  A ∧ ⋁ (f <$> l) ⊃ B.
+Proof.
+  elim => [|x l IH]; intros.
+  * simpl. eqd.
+  * rewrite fmap_cons (cons_app (f x ⊃ B)) And_app And_singl.
+    rewrite fmap_cons (cons_app (f x)) Or_app Or_singl.
+    rewrite currying or_imp_distr [A ⊃ _ ∧ (_ ⊃ _)]imp_and_distr.
+    rewrite -[A ⊃ (⋁ _) ⊃ B]currying -IH.
+    rewrite -imp_and_distr.
+    reflexivity.
+Qed.
+
+Lemma imp_intro_r_inv A Γ C :
+  Γ ⟹ A ⊃ C ->
+  A :: Γ ⟹ C.
+Proof.
+  move => H.
+  pcut (A ⊃ C). by pweak 0. pimpL 0; passum.
+Qed.
+
+Lemma proper_concl C A B B' :
+  A ⊃ B ⟺ A ⊃ B' ->
+  A ⊃ (C ∨ B) ⟺ A ⊃ (C ∨ B').
+Proof.
+  move => H. eqd.
+  pimpL 1; isrch. L. R. permute A. apply imp_intro_r_inv. rewrite -H. isrch.
+  pimpL 1; isrch. L. R. permute A. apply imp_intro_r_inv. rewrite H. isrch.
 Qed.
 
 End Tautos.

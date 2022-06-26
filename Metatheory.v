@@ -220,25 +220,93 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma reproduction Δs Γ Π :
+  ⌊Γ ⊢ [⋅(λ Δ, Δ ⊢ Π) <$> Δs]⌋ ⟺ ⌊(⊢ Δs) ∪ Γ ⊢ Π⌋.
+Proof.
+  rewrite interp_flower_flowers -garden_flowers.
+  rewrite [fmg _ _]/= Or_singl.
+  rewrite /flowers_to_form /fmf -list_fmap_compose /compose.
+  rewrite (eqderiv_map (λ Δ, ⌊Δ ⊢ Π⌋) (λ Δ, ⌊Δ⌋ ⊃ ⋁ (gardens_to_form Π))).
+  { intros. simpl. rewrite true_and. reflexivity. }
+
+  rewrite interp_flower_flowers -garden_flowers.
+  rewrite interp_juxt interp_flower_flowers -garden_flowers.
+  rewrite [⌊∅⌋]/= true_imp_l.
+  pose proof (H := garden_flowers). symmetry in H.
+  repeat rewrite /fmg (eqderiv_map (λ Δ : garden, ⋀ (flowers_to_form Δ)) garden_to_form); auto.
+
+  rewrite and_comm.
+  apply or_intro_l_nary.
+Qed.
+
+Lemma permutation_garden Fs Fs' :
+  Fs ≡ₚ Fs' ->
+  ⌊⋅Fs⌋ ⟺ ⌊⋅Fs'⌋.
+Proof.
+  elim; clear Fs Fs'.
+  * reflexivity.
+  * move => F Fs Fs' Hperm IH.
+    rewrite (cons_app _ Fs') (cons_app _ Fs).
+    repeat rewrite -/(juxt (⋅[F]) (⋅Fs)) -/(juxt (⋅[F]) (⋅Fs')) interp_juxt.
+    rewrite IH. reflexivity.
+  * move => F G Fs. simpl. rewrite and_comm. eqd.
+  * move => Fs1 Fs2 Fs3 Hperm1 H1 Hperm2 H2.
+    rewrite H1 H2. reflexivity.
+Qed.
+
+Lemma permutation_flower (Π Π' : list garden) (Γ : garden) :
+  Π ≡ₚ Π' ->
+  ⌊Γ ⊢ Π⌋ ⟺ ⌊Γ ⊢ Π'⌋.
+Proof.
+  elim; clear Π Π'.
+  * reflexivity.
+  * move => Δ Fs Fs' Hperm IH.
+    simpl in *.
+    repeat rewrite true_and in IH.
+    repeat rewrite true_and.
+    by apply proper_concl.
+  * move => Δ Σ Π. simpl.
+    repeat rewrite true_and.
+    rewrite or_assoc [⌊Σ⌋ ∨ _]or_comm -or_assoc.
+    reflexivity.
+  * move => Π1 Π2 Π3 Hperm1 H1 Hperm2 H2.
+    rewrite H1 H2. reflexivity.
+Qed.
+
 Lemma local_soundness : ∀ (Γ Δ : garden),
   Γ ~> Δ -> [⌊Δ⌋] ⟹ ⌊Γ⌋.
 Proof.
   move => x y.
-  elim; clear x y.
+  elim; clear x y; intros.
 
   (* Pollination *)
 
-  * intros. by apply wind_pollination.
-  * intros. by apply wind_pollination.
-  * intros. by apply self_pollination.
-  * intros. by apply self_pollination.
+  * by apply wind_pollination.
+  * by apply wind_pollination.
+  * by apply self_pollination.
+  * by apply self_pollination.
 
   (* Reproduction *)
+
+  * by apply reproduction.
+
   (* Decomposition *)
+
+  * rewrite //=; isrch; pleft.
+  * rewrite //=; isrch; pleft.
+
   (* Permutation *)
+
+  * by apply permutation_garden.
+  * by apply permutation_flower.
+
   (* Hole insertion *)
+
+  * rewrite //=; isrch.
+
   (* Contextual closure *)
 
+  * admit.
 Admitted.
 
 Theorem soundness : ∀ Γ Δ,
