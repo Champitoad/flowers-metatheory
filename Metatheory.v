@@ -78,13 +78,20 @@ Proof.
   case Γ => *; reflexivity.
 Qed.
 
+Lemma interp_flower Γ Π :
+  ⌊Γ ⊢ Π⌋ ⟺
+  (⌊Γ⌋ ⊃ ⋁ (gardens_to_form Π)).
+Proof.
+  case: Γ => Fs //=.
+  rewrite true_and. reflexivity.
+Qed.
+
 Lemma interp_flower_flowers Γ Π :
   ⌊Γ ⊢ Π⌋ ⟺
   (⋀ (flowers_to_form Γ) ⊃ ⋁ (fmg (λ Δ, ⋀ (flowers_to_form Δ)) Π)).
 Proof.
-  case: Γ => Fs //=.
-  rewrite flower_flowers garden_gardens gardens_flowers.
-  rewrite true_and. reflexivity.
+  rewrite interp_flower garden_flowers gardens_flowers.
+  reflexivity.
 Qed.
 
 Lemma wpol_flower (A : form) (f : flower -> form) (Γ : garden) (Π : list garden) :
@@ -274,26 +281,26 @@ Proof.
 Qed.
 
 Lemma local_soundness : ∀ (Γ Δ : garden),
-  Γ ~> Δ -> [⌊Δ⌋] ⟹ ⌊Γ⌋.
+  Γ ⇀ Δ -> ⌊Γ⌋ ⟺ ⌊Δ⌋.
 Proof.
   move => x y.
   elim; clear x y; intros.
 
   (* Pollination *)
 
-  * by apply wind_pollination.
+  * symmetry. by apply wind_pollination.
   * by apply wind_pollination.
   * by apply self_pollination.
-  * by apply self_pollination.
+  * symmetry. by apply self_pollination.
 
   (* Reproduction *)
 
-  * by apply reproduction.
+  * symmetry. by apply reproduction.
 
   (* Decomposition *)
 
-  * rewrite //=; isrch; pleft.
-  * rewrite //=; isrch; pleft.
+  * rewrite //=; eqd. pimpL 0; isrch. pleft.
+  * rewrite //=; eqd. pleft.
 
   (* Permutation *)
 
@@ -302,20 +309,43 @@ Proof.
 
   (* Hole insertion *)
 
-  * rewrite //=; isrch.
+  * rewrite //=; eqd.
+Qed.
 
-  (* Contextual closure *)
-
-  * admit.
-Admitted.
+Lemma grounding : ∀ X Γ Δ i,
+  ⌊Γ⌋ ⟺ ⌊Δ⌋ ->
+  ⌊i ≔ Γ @ X⌋ ⟺ ⌊i ≔ Δ @ X⌋.
+Proof.
+  elim/garden_induction.
+  * move => j Γ Δ i. case Γ => Fs; case Δ => Gs. move => H.
+    rewrite //=. case (Nat.eqb j i); list_simplifier; auto. reflexivity.
+  * move => a Γ Δ i H. rewrite //=; reflexivity.
+  * move => Γ Π IHΓ IHΠ Σ Δ i H.
+    specialize (IHΓ Σ Δ i H).
+    repeat rewrite fill_flower interp_flower.
+    rewrite IHΓ.
+    elim: IHΠ => [|Δ' Π' HΔ' HΠ' IH]; [> reflexivity | ..].
+    repeat rewrite fmap_cons gardens_flowers /fmg fmap_cons cons_app Or_app Or_singl.
+    repeat rewrite -garden_flowers. rewrite (HΔ' _ _ _ H).
+    rewrite gardens_flowers /fmg in IH.
+    rewrite (proper_concl ⌊i ≔ Δ @ Δ'⌋).
+    apply IH.
+    rewrite gardens_flowers /fmg.
+    reflexivity.
+  * intros; eqd.
+  * move => F Fs HF HFs Γ Δ i H.
+    rewrite fill_cons fill_cons. repeat rewrite interp_juxt.
+    rewrite (HF _ _ _ H) (HFs _ _ _ H).
+    reflexivity.
+Qed.
 
 Theorem soundness : ∀ Γ Δ,
-  Γ ~>* Δ -> [⌊Δ⌋] ⟹ ⌊Γ⌋.
+  Γ ~>* Δ -> ⌊Γ⌋ ⟺ ⌊Δ⌋.
 Proof.
   move => x y.
   elim => [Γ |Γ Δ Σ Hstep H IH] //.
   clear x y.
-  * apply S_ax.
-  * apply local_soundness in Hstep.
-    pcut ⌊Δ⌋; auto. by pweak 1.
+  * reflexivity.
+  * rewrite -IH. elim: Hstep => Γ' Δ' X i H'.
+    apply grounding. by apply local_soundness.
 Qed.

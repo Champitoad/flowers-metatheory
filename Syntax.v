@@ -222,66 +222,75 @@ Definition juxt '(⋅ Fs) '(⋅ Fs') :=
 
 Infix "∪" := juxt.
 
-Reserved Infix "~>" (at level 80).
+Reserved Infix "⇀" (at level 80).
 
 Inductive step : garden -> garden -> Prop :=
 
 (** ** Pollination *)
 
 | R_wpol (F G : flower) (i : nat) :
-  F ∪ G ~>
+  F ∪ G ⇀
   F ∪ i ≔ F @ G
 
 | R_co_wpol (F G : flower) (i : nat) :
-  F ∪ i ≔ F @ G ~>
+  F ∪ i ≔ F @ G ⇀
   F ∪ G
 
 | R_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
-  F ∪ Γ ⊢ Δ :: Π ~>
+  F ∪ Γ ⊢ Δ :: Π ⇀
   F ∪ Γ ⊢ i ≔ F @ Δ :: Π
 
 | R_co_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
-  F ∪ Γ ⊢ i ≔ F @ Δ :: Π ~>
+  F ∪ Γ ⊢ i ≔ F @ Δ :: Π ⇀
   F ∪ Γ ⊢ Δ :: Π
 
 (** ** Reproduction *)
 
 | R_rep (Γ : garden) (Δs Π : list garden) :
-  (⊢ Δs) ∪ Γ ⊢ Π ~>
+  (⊢ Δs) ∪ Γ ⊢ Π ⇀
   Γ ⊢ [⋅ (λ Δ, Δ ⊢ Π) <$> Δs]
 
 (** ** Decomposition *)
 
 | R_pis	(Δ : garden) :
-  ⊢ [Δ] ~> Δ
+  ⊢ [Δ] ⇀ Δ
 
 | R_pet	(Γ : garden) (Π : list garden) :
-  Γ ⊢ ∅ :: Π ~> ∅
+  Γ ⊢ ∅ :: Π ⇀ ∅
 
 (** ** Permutation *)
 
 | R_perm_g (Fs Fs' : list flower) :
   Fs ≡ₚ Fs' ->
-  ⋅ Fs ~> ⋅ Fs'
+  ⋅ Fs ⇀ ⋅ Fs'
 
 | R_perm_f (Π Π' : list garden) (Γ : garden) :
   Π ≡ₚ Π' ->
-  Γ ⊢ Π ~> Γ ⊢ Π'
+  Γ ⊢ Π ⇀ Γ ⊢ Π'
 
 (** ** Hole insertion *)
 
 | R_hole (i : nat) :
-  ∅ ~> □i
+  ∅ ⇀ □i
+
+where "Γ ⇀ Δ" := (step Γ Δ).
 
 (** ** Contextual closure *)
 
+Reserved Infix "~>" (at level 80).
+
+Inductive cstep : garden -> garden -> Prop :=
 | R_ctx (Γ Δ X : garden) (i : nat) :
-  Γ ~> Δ ->
+  Γ ⇀ Δ ->
   i ≔ Γ @ X ~> i ≔ Δ @ X
 
-where "Γ ~> Δ" := (step Γ Δ).
+where "Γ ~> Δ" := (cstep Γ Δ).
 
-Infix "~>*" := (rtc step) (at level 80).
+(** ** Transitive closure *)
+
+Infix "~>*" := (rtc cstep) (at level 80).
+
+(** ** Examples *)
 
 Example deriv_contraction :
   ⋅ [♯"a"; ♯"b"] ~>* ⋅ [♯"a"; ♯"b"; ♯"b"].
