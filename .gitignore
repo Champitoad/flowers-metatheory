@@ -46,4 +46,4 @@ time-of-build-pretty.log
 
 # custom
 Correction.v
-Makefile*
+Makefile.*

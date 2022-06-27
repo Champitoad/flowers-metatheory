@@ -5,9 +5,20 @@ Open Scope string_scope.
 
 Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
 
-Axiom TODO : forall A : Type, A.
+Declare Scope flower_scope.
+Delimit Scope flower_scope with flower.
+Bind Scope flower_scope with flower.
 
-(** * Translations *)
+Declare Scope garden_scope.
+Delimit Scope garden_scope with garden.
+Bind Scope garden_scope with garden.
+
+Open Scope flower_scope.
+Open Scope garden_scope.
+
+(** * Soundness *)
+
+Section Soundness.
 
 Fixpoint flower_to_form (F : flower) : form :=
   match F with
@@ -24,21 +35,8 @@ Definition fmg := @fmap list list_fmap garden form.
 Definition flowers_to_form := fmf garden_to_form.
 Definition gardens_to_form := fmg garden_to_form.
 
-Declare Scope flower_scope.
-Delimit Scope flower_scope with flower.
-Bind Scope flower_scope with flower.
-
-Declare Scope garden_scope.
-Delimit Scope garden_scope with garden.
-Bind Scope garden_scope with garden.
-
 Notation "⌊ F ⌋" := (flower_to_form F) (format "⌊ F ⌋") : flower_scope.
 Notation "⌊ Γ ⌋" := (garden_to_form Γ) (format "⌊ Γ ⌋") : garden_scope.
-
-Open Scope flower_scope.
-Open Scope garden_scope.
-
-(** * Soundness *)
 
 Lemma flower_garden F :
   ⌊F⌋%flower ⟺ ⌊F⌋%garden.
@@ -349,3 +347,35 @@ Proof.
   * rewrite -IH. elim: Hstep => Γ' Δ' X i H'.
     apply grounding. by apply local_soundness.
 Qed.
+
+End Soundness.
+
+(** * Completeness *)
+
+Section Completeness.
+
+Reserved Notation "⌈ A ⌉" (format "⌈ A ⌉", at level 10).
+
+Fixpoint interp (A : form) : garden :=
+  match A with
+  | #a => ♯a
+  | ⊤ => ∅
+  | ⊥ => ∅ ⊢
+  | A ∧ B => ⌈A⌉ ∪ ⌈B⌉
+  | A ∨ B => ⊢ [⌈A⌉; ⌈B⌉]
+  | A ⊃ B => ⌈A⌉ ⊢ [⌈B⌉]
+  end
+  
+where "⌈ A ⌉" := (interp A).
+
+Lemma pollination :
+  Γ ⟹ C ->
+  ∀ X, 
+
+Theorem completeness Γ C :
+  Γ ⟹ C ->
+  ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
+Proof.
+Admitted.
+
+End Completeness.
