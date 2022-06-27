@@ -368,10 +368,6 @@ Fixpoint interp (A : form) : garden :=
   
 where "⌈ A ⌉" := (interp A).
 
-Lemma pollination :
-  Γ ⟹ C ->
-  ∀ X, 
-
 Theorem completeness Γ C :
   Γ ⟹ C ->
   ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
