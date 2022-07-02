@@ -311,4 +311,13 @@ Qed.
 
 (** Basic proof search *)
 
-Ltac rctx := apply (R_ctx □0 _ _ 0).
+Ltac rstep Δ :=
+  apply (rtc_l cstep _ Δ).
+
+Ltac rctx X i Γ Δ := apply (R_ctx X Γ Δ i).
+
+Ltac srctx :=
+  match goal with
+  | |- ?Γ ~> ?Δ =>
+      rctx □0 0 Γ Δ
+  end.

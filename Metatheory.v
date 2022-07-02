@@ -395,12 +395,24 @@ Proof.
         split; reflexivity.
 Admitted.
 
+Lemma fill_hole i Δ :
+  i ≔ Δ @ □i = Δ.
+Proof.
+  case Δ => Fs. rewrite /fill/=. list_simplifier. by rewrite Nat.eqb_refl.
+Qed.
+
 Theorem completeness Γ C :
   Γ ⟹ C ->
   ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
 Proof.
   elim; clear Γ C; intros; simpl.
-  * admit.
+  * set Δ := (X in X ⊢ _ ~>* _).
+    rstep (Δ ⊢ [⋅□0]). srctx. rewrite /Δ.
+    pose proof (H := R_co_spol ⌈A⌉ ⌈⋀ Γ⌉ (□0) [] 0).
+    rewrite fill_hole in H; auto.
+    rstep (Δ ⊢ [∅]). pose proof (R_ctx (Δ ⊢ [⋅□0]) (□0) ∅ 0).
+    rewrite /unisubst//= in H. rewrite fill_flower//= in H.
+    rewrite (fill_cons _ □0) //= in H.
 Admitted.
 
 End Completeness.
