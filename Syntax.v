@@ -228,21 +228,21 @@ Inductive step : garden -> garden -> Prop :=
 
 (** ** Pollination *)
 
-| R_wpol (F G : flower) (i : nat) :
-  F ∪ G ⇀
-  F ∪ i ≔ F @ G
+| R_wpol (Σ Δ : garden) (i : nat) :
+  Σ ∪ Δ ⇀
+  Σ ∪ i ≔ Σ @ Δ
 
-| R_co_wpol (F G : flower) (i : nat) :
-  F ∪ i ≔ F @ G ⇀
-  F ∪ G
+| R_co_wpol (Σ Δ : garden) (i : nat) :
+  Σ ∪ i ≔ Σ @ Δ ⇀
+  Σ ∪ Δ
 
-| R_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
-  F ∪ Γ ⊢ Δ :: Π ⇀
-  F ∪ Γ ⊢ i ≔ F @ Δ :: Π
+| R_spol (Σ Γ Δ : garden) (Π : list garden) (i : nat) :
+  Σ ∪ Γ ⊢ Δ :: Π ⇀
+  Σ ∪ Γ ⊢ i ≔ Σ @ Δ :: Π
 
-| R_co_spol (F : flower) (Γ Δ : garden) (Π : list garden) (i : nat) :
-  F ∪ Γ ⊢ i ≔ F @ Δ :: Π ⇀
-  F ∪ Γ ⊢ Δ :: Π
+| R_co_spol (Σ Γ Δ : garden) (Π : list garden) (i : nat) :
+  Σ ∪ Γ ⊢ i ≔ Σ @ Δ :: Π ⇀
+  Σ ∪ Γ ⊢ Δ :: Π
 
 (** ** Reproduction *)
 
@@ -268,10 +268,13 @@ Inductive step : garden -> garden -> Prop :=
   Π ≡ₚ Π' ->
   Γ ⊢ Π ⇀ Γ ⊢ Π'
 
-(** ** Hole insertion *)
+(** ** Holes *)
 
-| R_hole (i : nat) :
+| R_hole_ins (i : nat) :
   ∅ ⇀ □i
+
+| R_hole_del (i : nat) :
+  □i ⇀ ∅
 
 where "Γ ⇀ Δ" := (step Γ Δ).
 
@@ -280,7 +283,7 @@ where "Γ ⇀ Δ" := (step Γ Δ).
 Reserved Infix "~>" (at level 80).
 
 Inductive cstep : garden -> garden -> Prop :=
-| R_ctx (Γ Δ X : garden) (i : nat) :
+| R_ctx (X Γ Δ : garden) (i : nat) :
   Γ ⇀ Δ ->
   i ≔ Γ @ X ~> i ≔ Δ @ X
 
@@ -290,6 +293,8 @@ where "Γ ~> Δ" := (cstep Γ Δ).
 
 Infix "~>*" := (rtc cstep) (at level 80).
 
+Notation "Γ <~> Δ" := (Γ ~>* Δ /\ Δ ~>* Γ) (at level 80).
+
 (** ** Examples *)
 
 Example deriv_contraction :
@@ -297,9 +302,13 @@ Example deriv_contraction :
 Proof.
   transitivity (⋅ [♯"a"; ♯"b"; □0]).
   * apply rtc_once.
-    refine (R_ctx ∅ □0 (⋅[♯"a"; ♯"b"; □1]) 1 _).
-    refine (R_hole 0).
+    refine (R_ctx (⋅[♯"a"; ♯"b"; □1]) ∅ □0 1 _).
+    refine (R_hole_ins 0).
   * apply rtc_once.
-    refine (R_ctx (⋅[♯"b"; □0]) (⋅[♯"b"; ♯"b"]) (⋅[♯"a"; □0]) 0 _).
-    refine (R_wpol _ _ 0).
+    refine (R_ctx (⋅[♯"a"; □0]) (⋅[♯"b"; □0]) (⋅[♯"b"; ♯"b"]) 0 _).
+    refine (R_wpol ♯"b" □0 0).
 Qed.
+
+(** Basic proof search *)
+
+Ltac rctx := apply (R_ctx □0 _ _ 0).
