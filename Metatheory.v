@@ -1,9 +1,9 @@
 Require Import stdpp.list stdpp.relations.
 Require Import ssreflect.
 Require Import String.
-Open Scope string_scope.
 
 Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
+Close Scope string_scope.
 
 Declare Scope flower_scope.
 Delimit Scope flower_scope with flower.
@@ -22,7 +22,6 @@ Section Soundness.
 
 Fixpoint flower_to_form (F : flower) : form :=
   match F with
-  | □i => ⊤
   | ♯a => #a
   | Γ ⊢ Π => (garden_to_form Γ) ⊃ ⋁ (garden_to_form <$> Π)
   end
@@ -92,18 +91,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma fill_flower s Γ Π :
-  s @ (Γ ⊢ Π) = s @ Γ ⊢ (λ Δ, s @ Δ) <$> Π.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma fill_cons s F Fs :
-  s @ (⋅F :: Fs) = s @ F ∪ s @ ⋅Fs.
-Proof.
-  simpl. list_simplifier. reflexivity.
-Qed.
-
 Lemma flowers_juxt Γ Δ :
   (flowers_to_form (Γ ∪ Δ)) =
   (flowers_to_form Γ ++ flowers_to_form Δ)%list.
@@ -123,45 +110,52 @@ Lemma interp_cons F Fs :
   ⌊⋅F :: Fs⌋ ⟺ ⌊F⌋ ∧ ⌊⋅Fs⌋.
 Proof.
   rewrite /=; eqd.
-Qed. 
-
-Lemma wind_pollination i (Σ Δ : garden) :
-  ⌊Σ ∪ i ≔ Σ @ Δ⌋ ⟺ ⌊Σ ∪ Δ⌋.
-Proof.
-  rewrite interp_juxt interp_juxt.
-  elim/garden_induction: Δ => [j |a |Γ Π IHΓ IHΠ ||F Fs IHF IHFs].
-  - rewrite /=/unisubst; list_simplifier.
-    case Σ => Fs. case (j =? i)%nat; eqd. 
-  - rewrite /=; eqd.
-  - rewrite fill_flower interp_flower.
-    rewrite wpol_imp_l wpol_imp_r wpol_Or.
-    rewrite -list_fmap_compose /compose.
-    rewrite Forall_equiv_map in IHΠ.
-    rewrite IHΓ IHΠ.
-    rewrite -wpol_Or -wpol_imp_r -wpol_imp_l.
-    rewrite -interp_flower.
-    by reflexivity.
-  - rewrite /=; eqd.
-  - rewrite fill_cons interp_juxt.
-    have H : ∀ A B C, A ∧ B ∧ C ⟺ (A ∧ B) ∧ (A ∧ C).
-    { eqd. pweak 0. pweak 0. isrch. }
-    rewrite H IHF IHFs.
-    rewrite -H. rewrite interp_cons.
-    by reflexivity.
 Qed.
 
-Lemma self_pollination i (Σ Γ Δ : garden) (Π : list garden) :
-  ⌊Σ ∪ Γ ⊢ Δ :: Π⌋ ⟺ ⌊Σ ∪ Γ ⊢ i ≔ Σ @ Δ :: Π⌋.
+Lemma ffill_gfill Γ ϕ :
+  ffill Γ ϕ = gfill Γ ϕ.
+Proof.
+  rewrite /=. case (ffill Γ ϕ) => Fs. list_simplifier. reflexivity.
+Qed.
+
+Lemma wind_pollination γ Γ :
+  ⌊Γ ∪ γ ! Γ⌋ ⟺ ⌊Γ ∪ γ ! ∅⌋.
+Proof.
+  rewrite interp_juxt interp_juxt.
+  elim/gctx_induction: γ => [|γ IH Π |γ IH Δ Π Π' |ϕ IH Fs Gs].
+  - rewrite /=. list_simplifier. rewrite flower_flowers -garden_flowers. eqd.
+  - rewrite /= true_and true_and.
+    rewrite wpol_imp_l IH -wpol_imp_l.
+    reflexivity.
+  - rewrite /= true_and true_and.
+    rewrite wpol_imp_r wpol_Or fmap_app fmap_cons IH
+            -fmap_cons -fmap_app -wpol_Or -wpol_imp_r.
+    reflexivity.
+  - rewrite /=.
+    rewrite [_ <$> Fs ++ _]fmap_app [_ <$> ffill Γ ϕ ++ _]fmap_app.
+    rewrite And_app And_app.
+    rewrite [_ <$> gl _]flower_flowers -garden_flowers.
+    rewrite and_assoc [⌊Γ⌋ ∧ _]and_comm -and_assoc [⌊Γ⌋ ∧ _]and_assoc.
+    rewrite ffill_gfill IH -ffill_gfill.
+    rewrite -and_assoc and_assoc -[_ ∧ ⌊Γ⌋]and_comm -and_assoc.
+    rewrite [⌊ffill _ _⌋]garden_flowers -flower_flowers.
+    rewrite -And_app -And_app.
+    rewrite -fmap_app -fmap_app.
+    reflexivity.
+Qed.
+
+Lemma self_pollination (γ : gctx) (Γ Δ : garden) (Π : list garden) :
+  ⌊Γ ∪ Δ ⊢ γ ! ∅ :: Π⌋ ⟺ ⌊Γ ∪ Δ ⊢ γ ! Γ :: Π⌋.
 Proof.
   rewrite interp_flower interp_juxt and_comm currying.
   rewrite /gardens_to_form/fmg fmap_cons.
   rewrite cons_app Or_app Or_singl.
-  rewrite (spol_r ⌊Σ⌋) and_or_distr.
+  rewrite (spol_r ⌊Γ⌋) and_or_distr.
 
-  rewrite -interp_juxt -(wind_pollination i Σ) interp_juxt.
+  rewrite -interp_juxt -(wind_pollination γ Γ) interp_juxt.
 
   rewrite -and_or_distr -spol_r.
-  rewrite -[⌊_ @ Δ⌋]Or_singl -Or_app -cons_app.
+  rewrite -[⌊_ ! _⌋]Or_singl -Or_app -cons_app.
   rewrite -fmap_cons -/fmg -/gardens_to_form.
   rewrite -currying -and_comm -interp_juxt -interp_flower.
 
@@ -241,44 +235,26 @@ Proof.
   (* Decomposition *)
 
   * rewrite //=; eqd. pimpL 0; isrch. pleft.
+  * rewrite //=; eqd. pleft. pimpL 0; isrch.
   * rewrite //=; eqd. pleft.
 
   (* Permutation *)
 
   * by apply permutation_garden.
   * by apply permutation_flower.
-
-  (* Holes *)
-
-  * rewrite //=; eqd.
-  * rewrite //=; eqd.
 Qed.
 
-Lemma grounding : ∀ X Γ Δ i,
+Lemma grounding : ∀ γ Γ Δ,
   ⌊Γ⌋ ⟺ ⌊Δ⌋ ->
-  ⌊i ≔ Γ @ X⌋ ⟺ ⌊i ≔ Δ @ X⌋.
+  ⌊γ ! Γ⌋ ⟺ ⌊γ ! Δ⌋.
 Proof.
-  elim/garden_induction.
-  * move => j Γ Δ i. case Γ => Fs; case Δ => Gs. move => H.
-    rewrite //=. case (Nat.eqb j i); list_simplifier; auto. reflexivity.
-  * move => a Γ Δ i H. rewrite //=; reflexivity.
-  * move => Γ Π IHΓ IHΠ Σ Δ i H.
-    specialize (IHΓ Σ Δ i H).
-    repeat rewrite fill_flower interp_flower.
-    rewrite IHΓ.
-    elim: IHΠ => [|Δ' Π' HΔ' HΠ' IH]; [> reflexivity | ..].
-    repeat rewrite fmap_cons gardens_flowers /fmg fmap_cons cons_app Or_app Or_singl.
-    repeat rewrite -garden_flowers. rewrite (HΔ' _ _ _ H).
-    rewrite gardens_flowers /fmg in IH.
-    rewrite (proper_concl ⌊i ≔ Δ @ Δ'⌋).
-    apply IH.
-    rewrite gardens_flowers /fmg.
-    reflexivity.
-  * intros; eqd.
-  * move => F Fs HF HFs Γ Δ i H.
-    rewrite fill_cons fill_cons. repeat rewrite interp_juxt.
-    rewrite (HF _ _ _ H) (HFs _ _ _ H).
-    reflexivity.
+  elim/gctx_induction => [Γ Δ H |γ H Π Γ Δ IH |γ H Γ Π Π' Σ Δ IH |ϕ H Fs Gs Γ Δ IH];
+  rewrite /=; list_simplifier.
+  * repeat rewrite flower_flowers -garden_flowers. exact.
+  * repeat rewrite true_and. rewrite (H _ _ IH). reflexivity.
+  * repeat rewrite true_and. rewrite (H _ _ IH). reflexivity.
+  * rewrite And_app And_app. rewrite -[gl _]app_nil_r. rewrite (H _ _ IH).
+    rewrite app_nil_r -And_app -And_app. reflexivity.
 Qed.
 
 Theorem soundness : ∀ Γ Δ,
@@ -288,7 +264,7 @@ Proof.
   elim => [Γ |Γ Δ Σ Hstep H IH] //.
   clear x y.
   * reflexivity.
-  * rewrite -IH. elim: Hstep => Γ' Δ' X i H'.
+  * rewrite -IH. elim: Hstep => γ Γ' Δ' H'.
     apply grounding. by apply local_soundness.
 Qed.
 
@@ -314,105 +290,11 @@ where "⌈ A ⌉" := (interp A).
 
 Notation "⌈[ Γ ]⌉" := (interp <$> Γ).
 
-Reserved Notation "F ⋲ Γ" (at level 70).
-
-Inductive occurs (F : flower) : garden -> Prop :=
-
-| occ_in (Γ : garden) :
-  In F Γ ->
-  F ⋲ Γ
-
-| occ_pistil Γ Π :
-  F ⋲ Γ ->
-  F ⋲ (Γ ⊢ Π)
-
-| occ_petal Γ Δ Π :
-  F ⋲ Δ -> In Δ Π ->
-  F ⋲ (Γ ⊢ Π)
-
-| occ_garden (G : flower) (Γ : garden) :
-  F ⋲ G -> In G Γ ->
-  F ⋲ Γ
-
-where "F ⋲ Γ" := (occurs F Γ).
-
-Reserved Notation "Δ ∈ X ! i" (at level 70).
-
-Inductive irrigates (Δ : garden) (i : nat) : garden -> Prop :=
-
-| irr_vacuous X :
-  ~ (□i ⋲ X) ->
-  Δ ∈ X ! i
-
-| irr_wpol (Γ : garden) :
-  Forall (λ F, In F Γ) Δ ->
-  Δ ∈ Γ ! i
-
-| irr_spol (Γ : garden) Π :
-  Forall (λ F, In F Γ) Δ ->
-  Δ ∈ (Γ ⊢ Π) ! i
-
-| irr_flower Γ Π :
-  Δ ∈ Γ ! i -> Forall (λ Σ, Δ ∈ Σ ! i) Π ->
-  Δ ∈ (Γ ⊢ Π) ! i 
-
-| irr_garden (Γ : garden) :
-  Forall (λ F : flower, Δ ∈ F ! i) Γ ->
-  Δ ∈ Γ ! i
-
-where "Δ ∈ X ! i" := (irrigates Δ i X).
-
-Definition firrigates (Γ : list form) (i : nat) (X : garden) : Prop :=
-  Forall (λ A, ⌈A⌉ ∈ X ! i) Γ.
-
-Notation "Γ ⊆ X ! i" := (firrigates Γ i X) (at level 70).
-
-Lemma not_occurs_neq i j :
-  ¬ □i ⋲ □j -> Nat.eqb i j = false.
-Proof.
-  move => H. apply Nat.eqb_neq. move => Hij.
-  have HIn : In □i □j. { econs. }
-  apply H. econs.
-Qed.
-
-Lemma pollination Γ C :
-  Γ ⟹ C -> ∀ X i, Γ ⊆ X ! i ->
-  X <~> (i ≔ ⌈C⌉) @ X.
-Proof.  
-  elim; clear Γ C.
-  * move => A Γ X i H. inv H. clear H3; move: X H2.
-    elim/garden_induction.
-    - case ⌈A⌉ => Fs j H.
-      inv H.
-      + apply not_occurs_neq in H0. rewrite Nat.eqb_sym in H0.
-        rewrite /fill/=. list_simplifier.
-        rewrite H0. split; by reflexivity.
-      + inv H0. have H' : Fs = []. { auto. }
-        rewrite H'. rewrite /fill//=; list_simplifier. case (Nat.eqb j i).
-        split.
-        apply rtc_once; apply (R_ctx □0 □j ∅ 0); apply R_hole_del.
-        apply rtc_once; apply (R_ctx □0 ∅ □j 0); apply R_hole_ins.
-        split; reflexivity.
-Admitted.
-
-Lemma fill_hole i Δ :
-  i ≔ Δ @ □i = Δ.
-Proof.
-  case Δ => Fs. rewrite /fill/=. list_simplifier. by rewrite Nat.eqb_refl.
-Qed.
-
 Theorem completeness Γ C :
   Γ ⟹ C ->
   ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
 Proof.
   elim; clear Γ C; intros; simpl.
-  * set Δ := (X in X ⊢ _ ~>* _).
-    rstep (Δ ⊢ [⋅□0]). srctx. rewrite /Δ.
-    pose proof (H := R_co_spol ⌈A⌉ ⌈⋀ Γ⌉ (□0) [] 0).
-    rewrite fill_hole in H; auto.
-    rstep (Δ ⊢ [∅]). pose proof (R_ctx (Δ ⊢ [⋅□0]) (□0) ∅ 0).
-    rewrite /unisubst//= in H. rewrite fill_flower//= in H.
-    rewrite (fill_cons _ □0) //= in H.
 Admitted.
 
 End Completeness.
