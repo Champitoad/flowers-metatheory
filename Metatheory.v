@@ -291,10 +291,36 @@ where "⌈ A ⌉" := (interp A).
 Notation "⌈[ Γ ]⌉" := (interp <$> Γ).
 
 Theorem completeness Γ C :
-  Γ ⟹ C ->
+  Γ c⟹ C ->
   ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
 Proof.
-  elim; clear Γ C; intros; simpl.
+  elim =>/=; clear Γ C.
+
+  (* Axiom *)
+  * move => A Γ.
+    rstep (⌈A⌉ ∪ ⌈⋀ Γ⌉ ⊢ [∅]). rctx □. rspol □ ⌈A⌉ ⌈⋀ Γ⌉ (@nil garden).
+    rstep ∅. rctx □. apply R_pet.
+    reflexivity.
+  
+  (* Right ⊤ *)
+  * move => Γ. rstep ∅. rctx □. apply R_pet. reflexivity.
+
+  (* Right ∧ *)
+  * move => A B Γ Hp1 IH1 Hp2 IH2.
 Admitted.
 
 End Completeness.
+
+(** * Deduction *)
+
+Definition entails Γ Δ := Γ ⊢ [Δ] ~>* ∅.
+
+Infix "===>" := entails (at level 90).
+
+Theorem deduction Γ Δ :
+  Γ ===> Δ <-> ∅ ===> (Γ ⊢ [Δ]).
+Proof.
+  split; rewrite /entails; move => H.
+  * rstep (Γ ⊢ [Δ]). rctx □. apply R_pis. exact.
+  * rstep (⊢ [fg (Γ ⊢ [Δ])]). rctx □. apply R_co_pis. exact.
+Qed.

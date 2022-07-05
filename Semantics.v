@@ -100,6 +100,68 @@ Inductive deriv : list form -> form -> Prop :=
 
 where "Γ ⟹ C" := (deriv Γ C).
 
+(** ** Cut-free derivations *)
+
+Reserved Infix "c⟹" (at level 90).
+
+Inductive cderiv : list form -> form -> Prop :=
+
+(** ** Identity *)
+
+| Sc_ax A Γ :
+  A :: Γ c⟹ A
+
+(** ** Right rules *)
+
+| Sc_R_true Γ :
+  Γ c⟹ ⊤
+
+| Sc_R_and A B Γ :
+  Γ c⟹ A -> Γ c⟹ B ->
+  Γ c⟹ A ∧ B
+
+| Sc_R_or_l A B Γ :
+  Γ c⟹ A ->
+  Γ c⟹ A ∨ B
+
+| Sc_R_or_r A B Γ :
+  Γ c⟹ B ->
+  Γ c⟹ A ∨ B
+
+| Sc_R_imp A B Γ :
+  A :: Γ c⟹ B ->
+  Γ c⟹ A ⊃ B
+
+(** ** Left rules *)
+
+| Sc_L_true Γ C :
+  Γ c⟹ C ->
+  ⊤ :: Γ c⟹ C
+
+| Sc_L_false Γ C :
+  ⊥ :: Γ c⟹ C
+
+| Sc_L_and A B Γ C :
+  A :: B :: Γ c⟹ C ->
+  (A ∧ B) :: Γ c⟹ C
+
+| Sc_L_or A B Γ C :
+  A :: Γ c⟹ C -> B :: Γ c⟹ C ->
+  (A ∨ B) :: Γ c⟹ C
+
+| Sc_L_imp A B Γ C :
+  Γ c⟹ A -> B :: Γ c⟹ C ->
+  (A ⊃ B) :: Γ c⟹ C
+
+(** ** Permutation *)
+
+| Sc_perm Γ Γ' C :
+  Γ ≡ₚ Γ' ->
+  Γ c⟹ C ->
+  Γ' c⟹ C
+
+where "Γ c⟹ C" := (cderiv Γ C).
+
 (** * Basic proof search *)
 
 Ltac permute A :=

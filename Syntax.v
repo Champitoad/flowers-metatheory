@@ -252,3 +252,31 @@ Qed.
 
 Ltac rstep Δ :=
   apply (rtc_l cstep _ Δ).
+
+Ltac rctx γ :=
+  match goal with
+  | |- ?Γ ~> ?Δ =>
+      apply (R_ctx γ Γ Δ)
+  end.
+
+Lemma fill_hole Γ :
+  □ ! Γ = Γ.
+Proof.
+  case Γ => Fs /=. list_simplifier. reflexivity.
+Qed.
+
+Ltac rwpol γ Γ :=
+  let Hins := fresh "H" in
+  let Hdel := fresh "H" in
+  pose proof (Hins := R_wpol γ Γ);
+  pose proof (Hdel := R_co_wpol γ Γ);
+  repeat rewrite fill_hole in Hins, Hdel; (exact Hins || exact Hdel);
+  clear Hins Hdel.
+
+Ltac rspol γ Γ Δ Π :=
+  let Hins := fresh "H" in
+  let Hdel := fresh "H" in
+  pose proof (Hins := R_spol γ Γ Δ Π);
+  pose proof (Hdel := R_co_spol γ Γ Δ Π);
+  repeat rewrite fill_hole in Hins, Hdel; (exact Hins || exact Hdel);
+  clear Hins Hdel.
