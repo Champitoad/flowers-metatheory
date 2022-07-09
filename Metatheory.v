@@ -323,12 +323,12 @@ Proof.
     rstep ∅. rself. apply R_pet.
     reflexivity.
   
-  (* Right ⊤ *)
+  (* R⊤ *)
   * move => Γ.
   
     rpetm (@nil nat). reflexivity.
 
-  (* Right ∧ *)
+  (* R∧ *)
   * move => A B Γ.
     case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ Γ⌉ => Γs. simpl.
     move => Hp1 IH1 Hp2 IH2.
