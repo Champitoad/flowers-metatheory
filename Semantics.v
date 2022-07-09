@@ -657,3 +657,12 @@ Proof.
 Qed.
 
 End Tautos.
+
+(** * Fun facts *)
+
+Lemma contraction_cut A Γ C :
+  A :: A :: Γ ⟹ C ->
+  A :: Γ ⟹ C.
+Proof.
+  move => H. pcut A. apply S_ax. exact H.
+Qed.
