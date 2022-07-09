@@ -153,6 +153,12 @@ Inductive cderiv : list form -> form -> Prop :=
   Γ c⟹ A -> B :: Γ c⟹ C ->
   (A ⊃ B) :: Γ c⟹ C
 
+(** ** Contraction *)
+
+| Sc_contr A Γ C :
+  A :: A :: Γ c⟹ C ->
+  A :: Γ c⟹ C
+
 (** ** Permutation *)
 
 | Sc_perm Γ Γ' C :

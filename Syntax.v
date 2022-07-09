@@ -203,15 +203,6 @@ Proof.
     rewrite H. by list_simplifier.
 Qed.
 
-Definition split_at {A} (i : nat) (xs : list A) : option (list A * list A) :=
-  let fix aux l i xs :=
-    match i, xs with
-    | 0, _ => Some (reverse l, xs)
-    | S n, a :: xs => aux (a :: l) n xs
-    | _, _ => None
-    end
-  in aux [] i xs.
-
 Fixpoint fpath (p : list nat) (F : flower) : option (fctx * garden) :=
   match p with
   | [] => Some (□, fg F)

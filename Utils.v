@@ -56,6 +56,15 @@ Qed.
 
 (** * Lists *)
 
+Definition split_at {A} (i : nat) (xs : list A) : option (list A * list A) :=
+  let fix aux l i xs :=
+    match i, xs with
+    | 0, _ => Some (reverse l, xs)
+    | S n, a :: xs => aux (a :: l) n xs
+    | _, _ => None
+    end
+  in aux [] i xs.
+
 Fixpoint list_remove_none {A} (l : list (option A)) : list A :=
   match l with
   | nil => nil

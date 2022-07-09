@@ -451,6 +451,17 @@ Proof.
     rpism [0;0;0].
     exact.
 
+  (* Contraction *)
+  * move => A Γ C.
+    case ⌈A⌉ => As; case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs; simpl.
+    move => Hp1 IH1.
+
+    rstepm_app [0;0] 0 (⋅As ++ As).
+    rctx (Planter [] (Pistil (Planter [] □ Γs) [⋅Cs]) []) (⋅As) (⋅As ++ As).
+    rwpol □ (⋅As).
+
+    exact.
+
   (* Permutation *)
   * move => Γ Γ' C.
     move => Hperm Ip1 IH1.
