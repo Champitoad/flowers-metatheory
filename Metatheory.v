@@ -290,6 +290,24 @@ where "⌈ A ⌉" := (interp A).
 
 Notation "⌈[ Γ ]⌉" := (interp <$> Γ).
 
+Lemma interp_And : ∀ (Γ : list form),
+  ⌈⋀ Γ⌉ = ⋃ ⌈[Γ]⌉.
+Proof.
+  elim => [|A Γ IH] //=. by rewrite IH.
+Qed.
+
+Lemma Juxt_Bind : ∀ (Π : list garden),
+  ⋃ Π = ⋅(Δ ← Π; gl Δ).
+Proof.
+  elim => [|Δ Π IH] //=. case Δ => Fs. rewrite IH //=.
+Qed.
+
+Global Instance Juxt_Permutation : Proper ((≡ₚ) ==> (≡ₚ)) Juxt.
+Proof.
+  repeat red. move => Π Π' H.
+  repeat rewrite Juxt_Bind. apply (bind_Permutation gl Π Π' H).
+Qed.
+
 Theorem completeness Γ C :
   Γ c⟹ C ->
   ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
@@ -298,16 +316,157 @@ Proof.
 
   (* Axiom *)
   * move => A Γ.
-    rstep (⌈A⌉ ∪ ⌈⋀ Γ⌉ ⊢ [∅]). rctx □. rspol □ ⌈A⌉ ⌈⋀ Γ⌉ (@nil garden).
-    rstep ∅. rctx □. apply R_pet.
+    case ⌈A⌉ => As; case ⌈⋀ Γ⌉ => Γs; simpl.
+
+    rstepm [0;1] ∅. rself.
+    rspol □ (⋅As) (⋅Γs) (@nil garden).
+    rstep ∅. rself. apply R_pet.
     reflexivity.
   
   (* Right ⊤ *)
-  * move => Γ. rstep ∅. rctx □. apply R_pet. reflexivity.
+  * move => Γ.
+  
+    rpetm (@nil nat). reflexivity.
 
   (* Right ∧ *)
-  * move => A B Γ Hp1 IH1 Hp2 IH2.
-Admitted.
+  * move => A B Γ.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ Γ⌉ => Γs. simpl.
+    move => Hp1 IH1 Hp2 IH2.
+
+    rstepm_app [0;1] 0 (⋅[⊢ [⋅As]]).
+    rctxm_app [0;1] 0.
+    rcopis.
+
+    rstepm_cons [0;1] 1 (⋅[⊢ [⋅Bs]]).
+    rctxm_cons [0;1] 1.
+    rcopis.
+
+    spol [0;1;0;0].
+    spol [0;1;1;0].
+
+    rctxmH [0;1;0] IH1.
+    rctxmH [0;1;0] IH2.
+
+    rpetm (@nil nat).
+    reflexivity.
+
+  (* R∨₁ *)
+  * move => A B Γ.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1.
+
+    rcopism [0;1;0;1].
+    spol [0;1;0;1;0;0].
+    rctxmH [0;1;0;1;0] IH1.
+    rpetm [0;1].
+    rpetm (@nil nat).
+    reflexivity.
+
+  (* R∨₂ *)
+  * move => A B Γ.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1.
+
+    rcopism [0;1;0;2].
+    spol [0;1;0;2;0;0].
+    rctxmH [0;1;0;2;0] IH1.
+
+    rcstepm [0;1;0] (⊢ [∅; ⋅As]).
+    apply R_perm_f; solve_Permutation.
+
+    rpetm [0;1].
+    rpetm (@nil nat).
+    reflexivity.
+
+  (* R⊃ *)
+  * move => A B Γ.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1.
+
+    rstepm [0;1;0;0] (⋅As ++ Γs). rself.
+    rspol (Planter [] (Pistil (Planter As □ []) [⋅Bs]) []) (⋅Γs) ∅ (@nil garden).
+
+    rctxmH [0;1;0] IH1.
+    rpetm (@nil nat).
+    reflexivity.
+
+  (* L⊤ *)
+  * move => Γ C.
+    case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1.
+
+    exact.
+
+  (* L⊥ *)
+  * move => Γ C.
+    case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs.
+
+    rstep (⋅Γs ⊢ [∅]). rself.
+    rewrite /fg. rrep.
+    rpetm (@nil nat). reflexivity.
+
+  (* L∧ *)
+  * move => A B Γ C.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1.
+
+    simpl in *. by rewrite -app_assoc.
+
+  (* L∨ *)
+  * move => A B Γ C.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1 Hp2 IH2.
+    
+    rstep (⋅(⋅Γs ⊢ [⋅[⋅As ⊢ [⋅Cs]; ⋅Bs ⊢ [⋅Cs]]])). rself.
+    rewrite /fg. rrep.
+
+    rstepm [0;1;0;0] (⋅As ++ Γs). rself.
+    rspol (Planter [] (Pistil (Planter As □ []) [⋅Cs]) [⋅Bs ⊢ [⋅Cs]]) (⋅Γs) ∅ (@nil garden).
+    rstepm [0;1;1;0] (⋅Bs ++ Γs). rself.
+    rspol (Planter [⋅As ++ Γs ⊢ [⋅Cs]] (Pistil (Planter Bs □ []) [⋅Cs]) []) (⋅Γs) ∅ (@nil garden).
+
+    rctxmH [0;1;0] IH1.
+    rctxmH [0;1;0] IH2.
+
+    rpetm (@nil nat). reflexivity.
+
+  (* L⊃ *)
+  * move => A B Γ C.
+    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈C⌉ => Cs; case ⌈⋀ Γ⌉ => Γs.
+    move => Hp1 IH1 Hp2 IH2.
+
+    rcopism [0;0;0;0].
+
+    rcstepm [0;0] (⋅Γs ++ [⋅[⊢ [⋅As]] ⊢ [⋅Bs]]).
+    apply R_perm_g; solve_Permutation.
+
+    rcstepm [0;0] (⋅Γs ++ [⋅[⋅Γs ⊢ [⋅As]] ⊢ [⋅Bs]]).
+    rwpolm [0;0;0;0].
+
+    rcstepm [0;0] (⋅(⋅[⋅Γs ⊢ [⋅As]] ⊢ [⋅Bs]) :: Γs).
+    apply R_perm_g; solve_Permutation.
+
+    rctxmH [0;0;0;0] IH1.
+
+    rpism [0;0;0].
+    exact.
+
+  (* Permutation *)
+  * move => Γ Γ' C.
+    move => Hperm Ip1 IH1.
+
+    have H : ⌈⋀ Γ⌉ ≡ₚ ⌈⋀ Γ'⌉.
+    { clear C Ip1 IH1.
+      repeat rewrite interp_And.
+      apply Juxt_Permutation.
+      by apply fmap_Permutation. }
+
+    destruct ⌈⋀ Γ⌉ as [Γs]. destruct ⌈⋀ Γ'⌉ as [Γs'].
+    rstepm [0;0] (⋅Γs).
+    rctxm [0;0]. apply R_perm_g; by symmetry.
+
+    exact.
+Qed.
 
 End Completeness.
 
@@ -321,6 +480,6 @@ Theorem deduction Γ Δ :
   Γ ===> Δ <-> ∅ ===> (Γ ⊢ [Δ]).
 Proof.
   split; rewrite /entails; move => H.
-  * rstep (Γ ⊢ [Δ]). rctx □. apply R_pis. exact.
-  * rstep (⊢ [fg (Γ ⊢ [Δ])]). rctx □. apply R_co_pis. exact.
+  * rstep (Γ ⊢ [Δ]). rself. apply R_pis. exact.
+  * rstep (⊢ [fg (Γ ⊢ [Δ])]). rself. apply R_co_pis. exact.
 Qed.

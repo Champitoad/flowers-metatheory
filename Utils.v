@@ -73,9 +73,28 @@ Fixpoint list_map_opt {A B} (f : A -> option B) (l : list A) : list B :=
       end
   end.
 
+Inductive MyIn {A} : A -> list A -> Prop :=
+| MyIn_head : ∀ (x : A) (l : list A), MyIn x (x :: l)
+| MyIn_tail : ∀ (x y : A) (l : list A), MyIn x l -> MyIn x (y :: l).
+
+Lemma My_In_is_in (A : Type) (x : A) (l : list A) : MyIn x l <-> In x l.
+Proof.
+  pose app_nil_r.
+  split.
+  { intros H. induction H. 
+    - simpl. left; reflexivity.
+    - simpl. right; assumption. }
+  { intros H. induction l. inversion H.
+    inversion H. rewrite H0. constructor.
+    constructor. apply IHl. apply H0. }
+
+Qed.
+
 Lemma list_sum_zero {l} :
   list_sum l = 0 -> forall x, In x l -> x = 0.
 Proof.
+  Print In.
+
   induction l; simpl; auto.
   * done.
   * intros. destruct H0.
