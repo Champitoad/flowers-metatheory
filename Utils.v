@@ -56,6 +56,20 @@ Qed.
 
 (** * Lists *)
 
+Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
+  (∀ x, In x l -> P x) <-> Forall P l.
+Proof.
+  elim.
+  * split; move => H; easy.
+  * move => a l IH. split; move => H.
+    - econs.
+      + apply H. econs.
+      + apply IH. move => y Hy.
+        apply H. simpl. by right.
+    - move => x HIn. inv HIn; inv H.
+      apply IH; auto.
+Qed.
+
 Definition split_at {A} (i : nat) (xs : list A) : option (list A * list A) :=
   let fix aux l i xs :=
     match i, xs with
@@ -81,23 +95,6 @@ Fixpoint list_map_opt {A B} (f : A -> option B) (l : list A) : list B :=
       | Some v => v :: list_map_opt f l
       end
   end.
-
-Inductive MyIn {A} : A -> list A -> Prop :=
-| MyIn_head : ∀ (x : A) (l : list A), MyIn x (x :: l)
-| MyIn_tail : ∀ (x y : A) (l : list A), MyIn x l -> MyIn x (y :: l).
-
-Lemma My_In_is_in (A : Type) (x : A) (l : list A) : MyIn x l <-> In x l.
-Proof.
-  pose app_nil_r.
-  split.
-  { intros H. induction H. 
-    - simpl. left; reflexivity.
-    - simpl. right; assumption. }
-  { intros H. induction l. inversion H.
-    inversion H. rewrite H0. constructor.
-    constructor. apply IHl. apply H0. }
-
-Qed.
 
 Lemma list_sum_zero {l} :
   list_sum l = 0 -> forall x, In x l -> x = 0.
@@ -146,6 +143,13 @@ Definition lequiv {A} (R : relation A) : relation (list A) :=
 
 Infix "≡ₗ@{ R }" :=
   (lequiv R) (at level 70, no associativity, only parsing).
+
+Lemma eq_map {A B} (f g : A -> B) : ∀ (l : list A),
+  (∀ x, f x = g x) ->
+  f <$> l = g <$> l.
+Proof.
+  elim => [|x l IH H] //=. rewrite H. f_equal. by apply IH.
+Qed.
 
 Lemma equiv_Forall {A} (P Q : A -> Prop) : ∀ (l : list A),
   (∀ x, P x <-> Q x) ->

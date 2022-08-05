@@ -2,28 +2,67 @@ Require Import String Setoid.
 Require Import stdpp.list.
 Require Import ssreflect.
 
-Require Import Flowers.Utils.
+Require Import Flowers.Terms Flowers.Utils.
 
 (** Our semantics will be the sequent calculus LJ *)
 
-(** * Formulas *)
+(** * Syntax *)
 
 Inductive form :=
-| FAtom : name -> form
-| FTrue : form
-| FFalse : form
-| FAnd : form -> form -> form
-| FOr : form -> form -> form
-| FImp : form -> form -> form.
+| FAtom (p : name) (args : list term)
+| FTrue
+| FFalse
+| FAnd (A : form) (B : form)
+| FOr (A : form) (B : form)
+| FImp (A : form) (B : form)
+| FForall (A : form)
+| FExists (A : form).
 
-Coercion FAtom : name >-> form.
-
-Notation "# a" := (FAtom a) (format "# a", at level 1).
 Notation "⊤" := FTrue.
 Notation "⊥" := FFalse.
 Infix "∧" := FAnd.
 Infix "∨" := FOr.
 Infix "⊃" := FImp (at level 85, right associativity).
+Notation "#∀ A" := (FForall A) (at level 1).
+Notation "#∃ A" := (FExists A) (at level 1).
+
+Lemma form_induction_full :
+  ∀ (P : form -> Prop) (Pt : term -> Prop)
+  (IHt : ∀ t, Pt t)
+  (IHatom : ∀ p args, Forall Pt args -> P (FAtom p args))
+  (IHtrue : P ⊤) (IHfalse : P ⊥)
+  (IHand : ∀ A B, P A -> P B -> P (A ∧ B))
+  (IHor : ∀ A B, P A -> P B -> P (A ∨ B))
+  (IHimp : ∀ A B, P A -> P B -> P (A ⊃ B))
+  (IHfa : ∀ A, P A -> P (#∀ A))
+  (IHex : ∀ A, P A -> P (#∃ A)),
+  ∀ A, P A.
+Proof.
+  intros; move: A; fix IH 1; induction A.
+  * apply IHatom. elim args; auto.
+  * apply IHtrue.
+  * apply IHfalse.
+  * apply IHand; auto.
+  * apply IHor; auto.
+  * apply IHimp; auto.
+  * apply IHfa; auto.
+  * apply IHex; auto.
+Qed.
+
+Lemma form_induction :
+  ∀ (P : form -> Prop)
+  (IHatom : ∀ p args, P (FAtom p args))
+  (IHtrue : P ⊤) (IHfalse : P ⊥)
+  (IHand : ∀ A B, P A -> P B -> P (A ∧ B))
+  (IHor : ∀ A B, P A -> P B -> P (A ∨ B))
+  (IHimp : ∀ A B, P A -> P B -> P (A ⊃ B))
+  (IHfa : ∀ A, P A -> P (#∀ A))
+  (IHex : ∀ A, P A -> P (#∃ A)),
+  ∀ A, P A.
+Proof.
+  intros; eapply form_induction_full; eauto.
+  exact (fun _ => I).
+Qed.
 
 Definition And :=
   foldr FAnd ⊤.
@@ -33,6 +72,39 @@ Definition Or :=
 
 Notation "⋀ As" := (And As) (at level 5).
 Notation "⋁ As" := (Or As) (at level 5).
+
+Fixpoint fshift (n : nat) (c : nat) (A : form) : form :=
+  match A with
+  | FAtom p args => FAtom p (tshift n c <$> args)
+  | FTrue | FFalse => A
+  | FAnd A B => FAnd (fshift n c A) (fshift n c B)
+  | FOr A B => FOr (fshift n c A) (fshift n c B)
+  | FImp A B => FImp (fshift n c A) (fshift n c B)
+  | FForall A => FForall (fshift n (c+1) A)
+  | FExists A => FExists (fshift n (c+1) A)
+  end.
+
+Fixpoint funshift (n : nat) (c : nat) (A : form) : form :=
+  match A with
+  | FAtom p args => FAtom p (tunshift n c <$> args)
+  | FTrue | FFalse => A
+  | FAnd A B => FAnd (funshift n c A) (funshift n c B)
+  | FOr A B => FOr (funshift n c A) (funshift n c B)
+  | FImp A B => FImp (funshift n c A) (funshift n c B)
+  | FForall A => FForall (funshift n (c+1) A)
+  | FExists A => FExists (funshift n (c+1) A)
+  end.
+
+Fixpoint fsubst (n : nat) (u : term) (A : form) : form :=
+  match A with
+  | FAtom p args => FAtom p (tsubst n u <$> args)
+  | FTrue | FFalse => A
+  | FAnd A B => FAnd (fsubst n u A) (fsubst n u B)
+  | FOr A B => FOr (fsubst n u A) (fsubst n u B)
+  | FImp A B => FImp (fsubst n u A) (fsubst n u B)
+  | FForall A => FForall (fsubst (n+1) (tshift 1 0 u) A)
+  | FExists A => FExists (fsubst (n+1) (tshift 1 0 u) A)
+  end.
 
 (** * Rules *)
 
@@ -70,6 +142,14 @@ Inductive deriv : list form -> form -> Prop :=
   A :: Γ ⟹ B ->
   Γ ⟹ A ⊃ B
 
+| S_R_forall Γ C :
+  (fshift 1 0 <$> Γ) ⟹ C ->
+  Γ ⟹ #∀ C
+
+| S_R_exists t Γ C :
+  Γ ⟹ funshift 1 0 (fsubst 0 (tshift 1 0 t) C) ->
+  Γ ⟹ #∃ C
+
 (** ** Left rules *)
 
 | S_L_true Γ C :
@@ -90,6 +170,14 @@ Inductive deriv : list form -> form -> Prop :=
 | S_L_imp A B Γ C :
   Γ ⟹ A -> B :: Γ ⟹ C ->
   (A ⊃ B) :: Γ ⟹ C
+
+| S_L_forall A t Γ C :
+  funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ ⟹ C ->
+  #∀ A :: Γ ⟹ C
+
+| S_L_exists A Γ C :
+  A :: (fshift 1 0 <$> Γ) ⟹ fshift 1 0 C ->
+  #∃ A :: Γ ⟹ C
 
 (** ** Permutation *)
 
@@ -132,6 +220,14 @@ Inductive cderiv : list form -> form -> Prop :=
   A :: Γ c⟹ B ->
   Γ c⟹ A ⊃ B
 
+| Sc_R_forall Γ C :
+  (fshift 1 0 <$> Γ) c⟹ C ->
+  Γ c⟹ #∀ C
+
+| Sc_R_exists t Γ C :
+  Γ c⟹ funshift 1 0 (fsubst 0 (tshift 1 0 t) C) ->
+  Γ c⟹ #∃ C
+
 (** ** Left rules *)
 
 | Sc_L_true Γ C :
@@ -152,6 +248,14 @@ Inductive cderiv : list form -> form -> Prop :=
 | Sc_L_imp A B Γ C :
   Γ c⟹ A -> B :: Γ c⟹ C ->
   (A ⊃ B) :: Γ c⟹ C
+
+| Sc_L_forall A t Γ C :
+  funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ c⟹ C ->
+  #∀ A :: Γ c⟹ C
+
+| Sc_L_exists A Γ C :
+  A :: (fshift 1 0 <$> Γ) c⟹ fshift 1 0 C ->
+  #∃ A :: Γ c⟹ C
 
 (** ** Contraction *)
 
@@ -206,6 +310,7 @@ Ltac pintroL i :=
         | ⊥ => S_L_false
         | _ ∧ _ => S_L_and
         | _ ∨ _ => S_L_or
+        | #∃ _ => S_L_exists
         end
       in permute X; apply rule
   end.
@@ -221,6 +326,18 @@ Ltac pimpL i :=
       in permute X; apply rule
   end.
 
+Ltac pfaL i t :=
+  match goal with
+  | |- ?Γ ⟹ _ => 
+      let X := eval simpl in (nth i Γ ⊤) in
+      let rule :=
+        match X with
+        | #∀ ?A =>
+            let r := eval simpl in (S_L_forall A t) in r
+        end
+      in permute X; apply rule
+  end.
+
 Ltac pintroR :=
   match goal with
   | |- _ ⟹ ?C =>
@@ -229,6 +346,18 @@ Ltac pintroR :=
         | ⊤ => S_R_true
         | _ ∧ _ => S_R_and
         | _ ⊃ _ => S_R_imp
+        | #∀ _ => S_R_forall
+        end
+      in apply rule
+  end.
+
+Ltac pexR t :=
+  match goal with
+  | |- _ ⟹ ?C =>
+      let rule :=
+        match C with
+        | #∃ _ =>
+            let r := eval simpl in (S_R_exists t) in r
         end
       in apply rule
   end.
@@ -252,27 +381,59 @@ Ltac eqd := split; isrch.
 Ltac pleft := apply S_R_or_l; isrch.
 Ltac pright := apply S_R_or_r; isrch.
 
-Lemma weakening A Γ C :
-  Γ ⟹ C ->
-  A :: Γ ⟹ C.
+Lemma tshift_zero c : ∀ t,
+  tshift 0 c t = t.
 Proof.
-  elim.
-  * move => B Γ'. isrch.
-  * move: C => _ B Γ' C Hr Hr' Hl Hl'.
-    have Hl'' : B :: A :: Γ' ⟹ C. { by permute A. }
-    by apply (S_cut B).
-  * move => Γ'. isrch.
-  * move => D B Γ' *. isrch.
-  * move => D B Γ' *. by apply S_R_or_l.
-  * move => D B Γ' *. by apply S_R_or_r.
-  * move => D B Γ' *. pintroR. by permute A.
-  * move => D B Γ' *. by pintroL 1.
-  * move => Γ' D. by pintroL 1.
-  * move => D B Γ' E *. pintroL 1.
-    apply (S_perm (A :: D :: B :: Γ')); auto. solve_Permutation.
-  * move => D B Γ' E *. pintroL 1; by permuti 1.
-  * move => D B Γ' E *. pimpL 1; auto. by permuti 1.
-  * move => Δ Δ' D *. apply (S_perm (A :: Δ)); auto.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n <? c); auto.
+  * f_equal. rewrite Forall_eq_map in IH.
+    by rewrite list_fmap_id in IH.
+Qed.
+
+Lemma fshift_zero : ∀ A c,
+  fshift 0 c A = A.
+Proof.
+  induction A using form_induction; intros c; simpl; auto.
+  * pose proof (H := eq_map (tshift 0 c) id args (tshift_zero c)).
+    by rewrite H list_fmap_id.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal. by rewrite IHA.
+  * f_equal. by rewrite IHA.
+Qed.
+
+Lemma shift_weakening Γ C (π : Γ ⟹ C) : ∀ D n,
+  (fshift n 0 D) :: Γ ⟹ C.
+Proof.
+  induction π; intros.
+  * isrch.
+  * have IHπ2' : A :: fshift n 0 D :: Γ ⟹ C.
+    { permute (fshift n 0 D). apply IHπ2. }
+    by apply (S_cut A).
+  * isrch.
+  * isrch.
+  * by apply S_R_or_l.
+  * by apply S_R_or_r.
+  * pintroR. by permute (fshift n 0 D).
+  * pintroR. by rewrite fmap_cons.
+  * by pexR t.
+  * by pintroL 1.
+  * by pintroL 1.
+  * pintroL 1.
+    apply (S_perm (fshift n 0 D :: A :: B :: Γ)); auto. solve_Permutation.
+  * pintroL 1; by permuti 1.
+  * pimpL 1; auto. by permuti 1.
+  * pfaL 1 t. by permuti 1.
+  * pintroL 1. by permuti 1.
+  * apply (S_perm (fshift n 0 D :: Γ)); auto.
+Qed.
+
+Lemma weakening Γ C (π : Γ ⟹ C) D :
+  D :: Γ ⟹ C.
+Proof.
+  pose proof (H := shift_weakening Γ C π D 0).
+  rewrite fshift_zero in H. by apply H.
 Qed.
 
 Ltac pweak i :=
