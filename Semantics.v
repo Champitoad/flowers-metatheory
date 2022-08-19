@@ -114,12 +114,31 @@ Inductive deriv : list form -> form -> Prop :=
 
 (** ** Identity *)
 
-| S_ax A Γ :
-  A :: Γ ⟹ A
+| S_ax A Γ Γ' :
+  Γ ++ A :: Γ' ⟹ A
 
-| S_cut A Γ C :
-  Γ ⟹ A -> A :: Γ ⟹ C ->
-  Γ ⟹ C
+| S_cut A Γ Γ' C :
+  Γ ++ Γ' ⟹ A -> Γ ++ A :: Γ' ⟹ C ->
+  Γ ++ Γ' ⟹ C
+
+(** ** Structural rules *)
+
+| S_perm Γ Γ' C :
+  Γ ≡ₚ Γ' ->
+  Γ ⟹ C ->
+  Γ' ⟹ C
+
+| S_weak A Γ Γ' C :
+  Γ ++ Γ' ⟹ C ->
+  Γ ++ A :: Γ' ⟹ C
+
+| S_contr_r A Γ Γ' Γ'' C :
+  Γ ++ A :: Γ' ++ A :: Γ'' ⟹ C -> 
+  Γ ++ Γ' ++ A :: Γ'' ⟹ C
+
+| S_contr_l A Γ Γ' Γ'' C :
+  Γ ++ A :: Γ' ++ A :: Γ'' ⟹ C -> 
+  Γ ++ A :: Γ' ++ Γ'' ⟹ C
 
 (** ** Right rules *)
 
@@ -152,39 +171,32 @@ Inductive deriv : list form -> form -> Prop :=
 
 (** ** Left rules *)
 
-| S_L_true Γ C :
-  Γ ⟹ C ->
-  ⊤ :: Γ ⟹ C
+| S_L_true Γ Γ' C :
+  Γ ++ Γ' ⟹ C ->
+  Γ ++ ⊤ :: Γ' ⟹ C
 
-| S_L_false Γ C :
-  ⊥ :: Γ ⟹ C
+| S_L_false Γ Γ' C :
+  Γ ++ ⊥ :: Γ' ⟹ C
 
-| S_L_and A B Γ C :
-  A :: B :: Γ ⟹ C ->
-  (A ∧ B) :: Γ ⟹ C
+| S_L_and A B Γ Γ' C :
+  Γ ++ A :: B :: Γ' ⟹ C ->
+  Γ ++ (A ∧ B) :: Γ' ⟹ C
 
-| S_L_or A B Γ C :
-  A :: Γ ⟹ C -> B :: Γ ⟹ C ->
-  (A ∨ B) :: Γ ⟹ C
+| S_L_or A B Γ Γ' C :
+  Γ ++ A :: Γ' ⟹ C -> Γ ++ B :: Γ' ⟹ C ->
+  Γ ++ (A ∨ B) :: Γ' ⟹ C
 
-| S_L_imp A B Γ C :
-  Γ ⟹ A -> B :: Γ ⟹ C ->
-  (A ⊃ B) :: Γ ⟹ C
+| S_L_imp A B Γ Γ' C :
+  Γ ++ Γ' ⟹ A -> Γ ++ B :: Γ' ⟹ C ->
+  Γ ++ (A ⊃ B) :: Γ' ⟹ C
 
-| S_L_forall A t Γ C :
-  funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ ⟹ C ->
-  #∀ A :: Γ ⟹ C
+| S_L_forall A t Γ Γ' C :
+  Γ ++ funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ' ⟹ C ->
+  Γ ++ #∀ A :: Γ' ⟹ C
 
-| S_L_exists A Γ C :
-  A :: (fshift 1 0 <$> Γ) ⟹ fshift 1 0 C ->
-  #∃ A :: Γ ⟹ C
-
-(** ** Permutation *)
-
-| S_perm Γ Γ' C :
-  Γ ≡ₚ Γ' ->
-  Γ ⟹ C ->
-  Γ' ⟹ C
+| S_L_exists A Γ Γ' C :
+  (fshift 1 0 <$> Γ) ++ A :: (fshift 1 0 <$> Γ') ⟹ fshift 1 0 C ->
+  Γ ++ #∃ A :: Γ' ⟹ C
 
 where "Γ ⟹ C" := (deriv Γ C).
 
@@ -196,8 +208,18 @@ Inductive cderiv : list form -> form -> Prop :=
 
 (** ** Identity *)
 
-| Sc_ax A Γ :
-  A :: Γ c⟹ A
+| Sc_ax A Γ Γ' :
+  Γ ++ A :: Γ' c⟹ A
+
+(** ** Structural rules *)
+
+| Sc_contr_r A Γ Γ' Γ'' C :
+  Γ ++ A :: Γ' ++ A :: Γ'' c⟹ C -> 
+  Γ ++ Γ' ++ A :: Γ'' c⟹ C
+
+| Sc_contr_l A Γ Γ' Γ'' C :
+  Γ ++ A :: Γ' ++ A :: Γ'' c⟹ C -> 
+  Γ ++ A :: Γ' ++ Γ'' c⟹ C
 
 (** ** Right rules *)
 
@@ -230,112 +252,106 @@ Inductive cderiv : list form -> form -> Prop :=
 
 (** ** Left rules *)
 
-| Sc_L_true Γ C :
-  Γ c⟹ C ->
-  ⊤ :: Γ c⟹ C
+| Sc_L_true Γ Γ' C :
+  Γ ++ Γ' c⟹ C ->
+  Γ ++ ⊤ :: Γ' c⟹ C
 
-| Sc_L_false Γ C :
-  ⊥ :: Γ c⟹ C
+| Sc_L_false Γ Γ' C :
+  Γ ++ ⊥ :: Γ' c⟹ C
 
-| Sc_L_and A B Γ C :
-  A :: B :: Γ c⟹ C ->
-  (A ∧ B) :: Γ c⟹ C
+| Sc_L_and A B Γ Γ' C :
+  Γ ++ A :: B :: Γ' c⟹ C ->
+  Γ ++ (A ∧ B) :: Γ' c⟹ C
 
-| Sc_L_or A B Γ C :
-  A :: Γ c⟹ C -> B :: Γ c⟹ C ->
-  (A ∨ B) :: Γ c⟹ C
+| Sc_L_or A B Γ Γ' C :
+  Γ ++ A :: Γ' c⟹ C -> Γ ++ B :: Γ' c⟹ C ->
+  Γ ++ (A ∨ B) :: Γ' c⟹ C
 
-| Sc_L_imp A B Γ C :
-  Γ c⟹ A -> B :: Γ c⟹ C ->
-  (A ⊃ B) :: Γ c⟹ C
+| Sc_L_imp A B Γ Γ' C :
+  Γ ++ Γ' c⟹ A -> Γ ++ B :: Γ' c⟹ C ->
+  Γ ++ (A ⊃ B) :: Γ' c⟹ C
 
-| Sc_L_forall A t Γ C :
-  funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ c⟹ C ->
-  #∀ A :: Γ c⟹ C
+| Sc_L_forall A t Γ Γ' C :
+  Γ ++ funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ' c⟹ C ->
+  Γ ++ #∀ A :: Γ' c⟹ C
 
-| Sc_L_exists A Γ C :
-  A :: (fshift 1 0 <$> Γ) c⟹ fshift 1 0 C ->
-  #∃ A :: Γ c⟹ C
-
-(** ** Contraction *)
-
-| Sc_contr A Γ C :
-  A :: A :: Γ c⟹ C ->
-  A :: Γ c⟹ C
-
-(** ** Permutation *)
-
-| Sc_perm Γ Γ' C :
-  Γ ≡ₚ Γ' ->
-  Γ c⟹ C ->
-  Γ' c⟹ C
+| Sc_L_exists A Γ Γ' C :
+  (fshift 1 0 <$> Γ) ++ A :: (fshift 1 0 <$> Γ') c⟹ fshift 1 0 C ->
+  Γ ++ #∃ A :: Γ' c⟹ C
 
 where "Γ c⟹ C" := (cderiv Γ C).
 
 (** * Basic proof search *)
 
-Ltac permute A :=
-  match goal with
-  | |- _ ⟹ _ => eapply (S_perm (A :: _) _ _); [> econs; try solve_Permutation | ..]
-  end.
-
-Ltac permuti i :=
-  match goal with
-  | |- ?Γ ⟹ _ =>
-      let X := eval simpl in (nth i Γ ⊤) in
-      permute X
-  end.
-
 Ltac passum :=
   match goal with
   | |- ?Γ ⟹ ?C =>
-      let rec aux Δ n :=
-        match Δ with
-        | ?C :: ?Δ => apply S_ax
-        | _ :: ?Δ =>
-            let i := constr:(S n) in
-            permuti i; aux Δ i
+      let rec aux Γl Γr :=
+        match Γr with
+        | ?C :: ?Δ => apply (S_ax C Γl Δ)
+        | ?A :: ?Δ => aux (Γl ++ [A]) Δ
+        | ?Δ ++ ?Δ' => aux (Γl ++ Δ) Δ'
+        | [] => fail
         end
       in 
-      aux Γ 0
+      aux (@nil form) Γ
+  end.
+
+Ltac pweak i :=
+  match goal with
+  | |- ?Γ ⟹ ?C =>
+      let X := eval cbn in (split_at i Γ) in
+      match X with
+      | Some (?Γl, ?A :: ?Γr) => apply (S_weak A Γl Γr)
+      | _ => fail
+      end
   end.
 
 Ltac pintroL i :=
   match goal with
   | |- ?Γ ⟹ _ => 
-      let X := eval simpl in (nth i Γ ⊤) in
-      let rule :=
-        match X with
-        | ⊤ => S_L_true
-        | ⊥ => S_L_false
-        | _ ∧ _ => S_L_and
-        | _ ∨ _ => S_L_or
-        | #∃ _ => S_L_exists
-        end
-      in permute X; apply rule
+      let X := eval cbn in (split_at i Γ) in
+      match X with
+      | Some (?Γl, ?A :: ?Γr) =>
+          let rule :=
+            match A with
+            | ⊤ => constr:(S_L_true Γl Γr)
+            | ⊥ => constr:(S_L_false Γl Γr)
+            | ?A ∧ ?B => constr:(S_L_and A B Γl Γr)
+            | ?A ∨ ?B => constr:(S_L_or A B Γl Γr)
+            | #∃ ?A => constr:(S_L_exists A Γl Γr)
+            end
+          in apply rule
+      end
   end.
 
 Ltac pimpL i :=
   match goal with
   | |- ?Γ ⟹ _ => 
-      let X := eval simpl in (nth i Γ ⊤) in
-      let rule :=
-        match X with
-        | _ ⊃ _ => S_L_imp
-        end
-      in permute X; apply rule
+      let X := eval cbn in (split_at i Γ) in
+      match X with
+      | Some (?Γl, ?A :: ?Γr) =>
+          let rule :=
+            match A with
+            | ?A ⊃ ?B => constr:(S_L_imp A B Γl Γr)
+            end
+          in apply rule
+      end
   end.
 
 Ltac pfaL i t :=
   match goal with
   | |- ?Γ ⟹ _ => 
-      let X := eval simpl in (nth i Γ ⊤) in
-      let rule :=
-        match X with
-        | #∀ ?A =>
-            let r := eval simpl in (S_L_forall A t) in r
-        end
-      in permute X; apply rule
+      let X := eval cbn in (split_at i Γ) in
+      match X with
+      | Some (?Γl, ?A :: ?Γr) =>
+          let rule :=
+            match X with
+            | #∀ ?A =>
+                let r := eval simpl in (S_L_forall A t) in r
+            end
+          in apply rule
+      end
   end.
 
 Ltac pintroR :=
@@ -403,44 +419,6 @@ Proof.
   * f_equal. by rewrite IHA.
 Qed.
 
-Lemma shift_weakening Γ C (π : Γ ⟹ C) : ∀ D n,
-  (fshift n 0 D) :: Γ ⟹ C.
-Proof.
-  induction π; intros.
-  * isrch.
-  * have IHπ2' : A :: fshift n 0 D :: Γ ⟹ C.
-    { permute (fshift n 0 D). apply IHπ2. }
-    by apply (S_cut A).
-  * isrch.
-  * isrch.
-  * by apply S_R_or_l.
-  * by apply S_R_or_r.
-  * pintroR. by permute (fshift n 0 D).
-  * pintroR. by rewrite fmap_cons.
-  * by pexR t.
-  * by pintroL 1.
-  * by pintroL 1.
-  * pintroL 1.
-    apply (S_perm (fshift n 0 D :: A :: B :: Γ)); auto. solve_Permutation.
-  * pintroL 1; by permuti 1.
-  * pimpL 1; auto. by permuti 1.
-  * pfaL 1 t. by permuti 1.
-  * pintroL 1. by permuti 1.
-  * apply (S_perm (fshift n 0 D :: Γ)); auto.
-Qed.
-
-Lemma weakening Γ C (π : Γ ⟹ C) D :
-  D :: Γ ⟹ C.
-Proof.
-  pose proof (H := shift_weakening Γ C π D 0).
-  rewrite fshift_zero in H. by apply H.
-Qed.
-
-Ltac pweak i :=
-  permuti i; apply weakening.
-
-Ltac pcut A := apply (S_cut A).
-
 (** * Generalized rewriting of equiderivable formulas *)
 
 Definition eqderiv (A B : form) : Prop :=
@@ -451,11 +429,11 @@ Infix "⟺" := eqderiv (at level 95).
 #[export] Instance equiv_eqderiv : Equivalence eqderiv.
 Proof.
   econs; repeat red.
-  * move => A. split; apply S_ax.
+  * move => A. split; passum.
   * move => A B [HAB HBA]; done.
   * move => A B C [HAB HBA] [HBC HCB]. split.
-    pcut B; auto. by pweak 1.
-    pcut B; auto. by pweak 1.
+    apply (S_cut B [] [A]); simpl; auto; by pweak 1.
+    apply (S_cut B [] [C]); simpl; auto; by pweak 1.
 Qed.
 
 #[export] Instance : Equiv form := eqderiv.
@@ -476,12 +454,8 @@ Add Morphism FOr with signature
 Proof.
   move => A B [HAB HBA] C D [HCD HDC].
   split.
-  * isrch.
-    by apply S_R_or_l.
-    by apply S_R_or_r.
-  * isrch.
-    by apply S_R_or_l.
-    by apply S_R_or_r.
+  * isrch. pleft. pright.
+  * isrch. pleft. pright.
 Qed.
 
 Add Morphism FImp with signature
@@ -490,8 +464,8 @@ Add Morphism FImp with signature
 Proof.
   move => A B [HAB HBA] C D [HCD HDC].
   split.
-  * isrch. pimpL 1. exact. by pweak 1.
-  * isrch. pimpL 1. exact. by pweak 1.
+  * isrch. pimpL 1. exact. by pweak 0.
+  * isrch. pimpL 1. exact. by pweak 0.
 Qed.
 
 Add Morphism And with signature
@@ -514,10 +488,10 @@ Proof.
   elim => [|A As IHA] //=.
   * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
   * elim => [H |B Bs IHB H] //=; split; decompose_Forall_hyps; isrch.
-    - apply S_R_or_l. apply H.
-    - apply S_R_or_r. by apply IHA.
-    - apply S_R_or_l. apply H.
-    - apply S_R_or_r. by apply IHA.
+    - pleft. apply H.
+    - pright. by apply IHA.
+    - pleft. apply H.
+    - pright. by apply IHA.
 Qed.
 
 Lemma proper_cons_left_deriv A B Γ C :
@@ -528,11 +502,11 @@ Proof.
   * move => HA.
     have HBA' : B :: Γ ⟹ A. { elim Γ => [|D Γ' IH]; auto. by pweak 1. } 
     have HA' : A :: B :: Γ ⟹ C. { by pweak 1. }
-    by pcut A.
+    apply (S_cut A [] (B :: Γ)); auto.
   * move => HB.
     have HAB' : A :: Γ ⟹ B. { elim Γ => [|D Γ' IH]; auto. by pweak 1. } 
     have HB' : B :: A :: Γ ⟹ C. { by pweak 1. }
-    by pcut B.
+    apply (S_cut B [] (A :: Γ)); auto.
 Qed.
 
 Lemma proper_app_deriv : ∀ Γ Γ' Δ C,
@@ -544,10 +518,10 @@ Proof.
   split; move => H.
   * specialize (IHΓ Γ' (B :: Δ) C HΓ).
     list_simplifier.
-    have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
-    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. }
-    apply (S_perm _ _ _ Hperm2). 
-    rewrite -(proper_cons_left_deriv _ _ _ _ HB).
+    (* have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
+    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. } *)
+    (* apply (S_perm _ _ _ Hperm2).  *)
+    (* rewrite -(proper_cons_left_deriv _ _ _ _ HB).
     have H' : B :: Δ ++ Γ ⟹ C. { by apply (S_perm _ _ _ Hperm1). }
     by apply IHΓ.
   * specialize (IHΓ Γ' (B' :: Δ) C HΓ).
@@ -557,8 +531,8 @@ Proof.
     symmetry in Hperm1. apply (S_perm _ _ _ Hperm1). 
     rewrite (proper_cons_left_deriv _ _ _ _ HB).
     have H' : B' :: Δ ++ Γ' ⟹ C. { symmetry in Hperm2. by apply (S_perm _ _ _ Hperm2). }
-    by apply IHΓ.
-Qed.
+    by apply IHΓ. *)
+Admitted.
 
 Add Parametric Morphism : deriv with signature
   Forall2 eqderiv ==> eqderiv ==> iff
@@ -567,11 +541,11 @@ Proof.
   move => Γ Δ HΓΔ C D [HCD HDC].
   move: Γ Δ HΓΔ.
   induction Γ, Δ; intros; try inv HΓΔ.
-  * split; move => H. by pcut C. by pcut D.
+  * split; move => H. by apply (S_cut C [] []). by apply (S_cut D [] []).
   * move: a f H2 H4 => E F HEF HΓΔ.
     pose proof (H := IHΓ _ HΓΔ); case: H => [H1 H2].
     split; move => H.
-    - pcut C.
+    - apply (S_cut C [] (F :: Δ)).
       { apply (proper_cons_left_deriv E F); auto.
         apply (proper_app_deriv Γ Δ [E]); auto. }
       pweak 1. elim Δ => [|? ? ?]; auto. by pweak 1.
@@ -755,13 +729,13 @@ Lemma wpol_Or {T} A (f : T -> form) : ∀ Γ,
   A ∧ ⋁ (f <$> Γ) ⟺ A ∧ ⋁ ((λ B, A ∧ f B) <$> Γ).
 Proof.
   elim => [|C Γ [IHl IHr]]; split; list_simplifier; isrch.
-  * apply S_R_or_l; isrch.
-  * apply S_R_or_r.
+  * pleft; isrch.
+  * pright.
     pcut (A ∧ ⋁ (f <$> Γ)). isrch.
     pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). pweak 1. by pweak 1.
     pintroL 0. cbv; passum.
-  * apply S_R_or_l; isrch.
-  * apply S_R_or_r.
+  * pleft; isrch.
+  * pright.
     pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). cbv; isrch.
     pweak 1. pweak 1.
     pcut (A ∧ ⋁ (f <$> Γ)). assumption.
