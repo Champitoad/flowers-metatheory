@@ -19,6 +19,12 @@ Ltac eq_decide x y :=
 
 (** * Logic *)
 
+Lemma contrapose {A B : Prop} :
+  (A -> B) -> (~ B -> ~ A).
+Proof.
+  intuition.
+Qed.
+
 Lemma neg_exists {A} {P : A -> Prop} :
   (~ exists x, P x) -> forall x, ~ P x.
 Proof.
@@ -211,6 +217,12 @@ Lemma map_id_ext {A} (l : list A) :
 Proof.
   elim: l => [|a l IHl] //=.
   by f_equal.
+Qed.
+
+Lemma map_singl {A B} (x : A) (f : A -> B) :
+  f <$> [x] = [f x].
+Proof.
+  reflexivity.
 Qed.
 
 Lemma bind_app {A B} (f : A -> list B) : forall (l l' : list A),

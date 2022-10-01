@@ -1,4 +1,4 @@
-Require Import String Setoid.
+Require Import String Setoid Lia.
 Require Import stdpp.list.
 Require Import ssreflect.
 
@@ -70,8 +70,22 @@ Definition And :=
 Definition Or :=
   foldr FOr ⊥.
 
+Fixpoint nforall n A :=
+  match n with
+  | 0 => A
+  | S n => #∀ (nforall n A)
+  end.
+
+Fixpoint nexists n A :=
+  match n with
+  | 0 => A
+  | S n => #∃ (nexists n A)
+  end.
+
 Notation "⋀ As" := (And As) (at level 5).
 Notation "⋁ As" := (Or As) (at level 5).
+Notation "n #∀ A" := (nforall n A) (format "n #∀  A", at level 6).
+Notation "n #∃ A" := (nexists n A) (format "n #∃  A", at level 6).
 
 Fixpoint fshift (n : nat) (c : nat) (A : form) : form :=
   match A with
@@ -105,6 +119,30 @@ Fixpoint fsubst (n : nat) (u : term) (A : form) : form :=
   | FForall A => FForall (fsubst (n+1) (tshift 1 0 u) A)
   | FExists A => FExists (fsubst (n+1) (tshift 1 0 u) A)
   end.
+
+Lemma fsubst_fshift A : ∀ c m,
+  fsubst c (TVar (c + m)) (fshift m (S c) A) = fshift m c A.
+Proof.
+  induction A; intros; simpl; auto; try by rewrite IHA1 IHA2.
+  * induction args; auto. list_simplifier.
+    f_equal. f_equal; auto. by apply (tsubst_tshift c m).
+  * specialize (IHA (c + 1) m). f_equal.
+    assert (H : c + m + 1 = c + 1 + m). { lia. } by rewrite H.
+  * specialize (IHA (c + 1) m). f_equal.
+    assert (H : c + m + 1 = c + 1 + m). { lia. } by rewrite H.
+Qed.
+
+Lemma funshift_fshift A : ∀ n c,
+  funshift n c (fshift n c A) = A.
+Proof.
+  induction A using form_induction; intros; simpl; auto;
+  try by rewrite IHA1 IHA2.
+  * rewrite -list_fmap_compose.
+    rewrite (eq_map _ id). apply tunshift_tshift.
+    by rewrite map_id_ext.
+  * by rewrite IHA.
+  * by rewrite IHA.
+Qed.
 
 (** * Rules *)
 
@@ -321,7 +359,7 @@ Ltac pintroL i :=
             | ?A ∨ ?B => constr:(S_L_or A B Γl Γr)
             | #∃ ?A => constr:(S_L_exists A Γl Γr)
             end
-          in apply rule
+          in apply rule; simpl
       end
   end.
 
@@ -335,7 +373,7 @@ Ltac pimpL i :=
             match A with
             | ?A ⊃ ?B => constr:(S_L_imp A B Γl Γr)
             end
-          in apply rule
+          in apply rule; simpl
       end
   end.
 
@@ -346,11 +384,10 @@ Ltac pfaL i t :=
       match X with
       | Some (?Γl, ?A :: ?Γr) =>
           let rule :=
-            match X with
-            | #∀ ?A =>
-                let r := eval simpl in (S_L_forall A t) in r
+            match A with
+            | #∀ ?A => constr:(S_L_forall A t Γl Γr)
             end
-          in apply rule
+          in apply rule; simpl
       end
   end.
 
@@ -389,7 +426,7 @@ Ltac isrch :=
         | S ?m => tryif pintroL m then isrch else introΓ m
         end
       in let n := eval compute in (length Γ) in
-      introΓ n
+      introΓ n; simpl
   end.
 
 Ltac eqd := split; isrch.
@@ -468,6 +505,22 @@ Proof.
   * isrch. pimpL 1. exact. by pweak 0.
 Qed.
 
+Add Morphism FForall with signature
+  eqderiv ==> eqderiv
+  as proper_forall.
+Proof.
+  move => A B [HAB HBA].
+  eqd; pfaL 0 (TVar 0); by rewrite fsubst_fshift funshift_fshift.
+Qed.
+
+Add Morphism FExists with signature
+  eqderiv ==> eqderiv
+  as proper_exists.
+Proof.
+  move => A B [HAB HBA].
+  eqd; pexR (TVar 0); by rewrite fsubst_fshift funshift_fshift.
+Qed.
+
 Add Morphism And with signature
   Forall2 eqderiv ==> eqderiv
   as proper_And.
@@ -494,6 +547,22 @@ Proof.
     - pright. by apply IHA.
 Qed.
 
+Add Morphism nforall with signature
+  eq ==> eqderiv ==> eqderiv
+  as proper_nforall.
+Proof.
+  elim => [|n IH A B H*] //=.
+  apply proper_forall. by apply IH.
+Qed.
+
+Add Morphism nexists with signature
+  eq ==> eqderiv ==> eqderiv
+  as proper_nexists.
+Proof.
+  elim => [|n IH A B H*] //=.
+  apply proper_exists. by apply IH.
+Qed.
+
 Lemma proper_cons_left_deriv A B Γ C :
   A ⟺ B -> 
   A :: Γ ⟹ C <-> B :: Γ ⟹ C.
@@ -518,10 +587,10 @@ Proof.
   split; move => H.
   * specialize (IHΓ Γ' (B :: Δ) C HΓ).
     list_simplifier.
-    (* have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
-    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. } *)
-    (* apply (S_perm _ _ _ Hperm2).  *)
-    (* rewrite -(proper_cons_left_deriv _ _ _ _ HB).
+    have Hperm1 : Δ ++ B :: Γ ≡ₚ B :: Δ ++ Γ. { by solve_Permutation. }
+    have Hperm2 : B' :: Δ ++ Γ' ≡ₚ Δ ++ B' :: Γ'. { by solve_Permutation. }
+    apply (S_perm _ _ _ Hperm2).
+    rewrite -(proper_cons_left_deriv _ _ _ _ HB).
     have H' : B :: Δ ++ Γ ⟹ C. { by apply (S_perm _ _ _ Hperm1). }
     by apply IHΓ.
   * specialize (IHΓ Γ' (B' :: Δ) C HΓ).
@@ -531,8 +600,8 @@ Proof.
     symmetry in Hperm1. apply (S_perm _ _ _ Hperm1). 
     rewrite (proper_cons_left_deriv _ _ _ _ HB).
     have H' : B' :: Δ ++ Γ' ⟹ C. { symmetry in Hperm2. by apply (S_perm _ _ _ Hperm2). }
-    by apply IHΓ. *)
-Admitted.
+    by apply IHΓ.
+Qed.
 
 Add Parametric Morphism : deriv with signature
   Forall2 eqderiv ==> eqderiv ==> iff
@@ -549,7 +618,7 @@ Proof.
       { apply (proper_cons_left_deriv E F); auto.
         apply (proper_app_deriv Γ Δ [E]); auto. }
       pweak 1. elim Δ => [|? ? ?]; auto. by pweak 1.
-    - pcut D.
+    - apply (S_cut D [] (E :: Γ)).
       { apply (proper_cons_left_deriv E F); auto.
         apply (proper_app_deriv Δ Γ [F]); auto.
         by symmetry in HΓΔ. }
@@ -580,7 +649,7 @@ Section Tautos.
 Lemma true_and A :
   A ∧ ⊤ ⟺ A.
 Proof.
-  split; isrch.
+  eqd.
 Qed.
 
 Lemma true_or A :
@@ -664,8 +733,9 @@ Lemma currying A B C :
   A ∧ B ⊃ C ⟺ A ⊃ B ⊃ C.
 Proof.
   eqd.
-  permuti 2. Unshelve. 4: exact [B; A]. solve_Permutation. pimpL 0; isrch.
-  permuti 2. Unshelve. 3: exact [B; A]. solve_Permutation. pimpL 0; isrch. pimpL 0; isrch.
+  pimpL 2; isrch.
+  pimpL 2; isrch.
+  pimpL 2; isrch.
 Qed.
 
 Lemma and_or_distr A B C :
@@ -680,9 +750,8 @@ Proof.
   eqd.
   pimpL 1; isrch. L.
   pimpL 1; isrch. R.
-  permuti 2. Unshelve. 3: exact [A ⊃ C; B ⊃ C]. solve_Permutation.
-  pintroL 0. pimpL 1; isrch.
-  pweak 1. pimpL 1; isrch.
+  pimpL 1; isrch.
+  pimpL 2; isrch.
 Qed.
 
 Lemma imp_and_distr A B C :
@@ -691,24 +760,24 @@ Proof.
   eqd.
   pimpL 1; isrch.
   pimpL 1; isrch.
-  pimpL 0; isrch.
   pimpL 1; isrch.
+  pimpL 2; isrch.
 Qed.
 
 Lemma wpol_imp_l A B C :
   A ∧ (B ⊃ C) ⟺ A ∧ (A ∧ B ⊃ C).
 Proof.
   eqd.
-  pimpL 1; isrch.
-  pimpL 1; isrch.
+  pimpL 3; isrch.
+  pimpL 2; isrch.
 Qed.
 
 Lemma wpol_imp_r A B C :
   A ∧ (B ⊃ C) ⟺ A ∧ (B ⊃ A ∧ C).
 Proof.
   eqd.
-  pimpL 1; isrch.
-  pimpL 1; isrch.
+  pimpL 2; isrch.
+  pimpL 2; isrch.
 Qed.
 
 Lemma wpol_And A : ∀ Γ,
@@ -731,14 +800,14 @@ Proof.
   elim => [|C Γ [IHl IHr]]; split; list_simplifier; isrch.
   * pleft; isrch.
   * pright.
-    pcut (A ∧ ⋁ (f <$> Γ)). isrch.
-    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). pweak 1. by pweak 1.
+    apply (S_cut (A ∧ ⋁ (f <$> Γ)) []); simpl. isrch.
+    apply (S_cut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)) []); simpl. pweak 1. by pweak 1.
     pintroL 0. cbv; passum.
   * pleft; isrch.
   * pright.
-    pcut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)). cbv; isrch.
+    apply (S_cut (A ∧ ⋁ ((λ x, A ∧ f x) <$> Γ)) []). cbv; isrch.
     pweak 1. pweak 1.
-    pcut (A ∧ ⋁ (f <$> Γ)). assumption.
+    apply (S_cut (A ∧ ⋁ (f <$> Γ)) []). assumption.
     pweak 1. isrch.
 Qed.
 
@@ -756,8 +825,8 @@ Proof.
   eqd.
   pimpL 1; isrch. L. R.
   pimpL 1; isrch. L. R.
-  pimpL 0; isrch. pimpL 1; isrch. L. R.
-  pimpL 1; isrch. R. R.
+  pimpL 1; isrch. pimpL 2; isrch. L. R.
+  pimpL 2; isrch. R. R.
 Qed.
 
 Lemma or_intro_l_nary {T} (f : T -> form) : ∀ l (A B : form),
@@ -779,7 +848,7 @@ Lemma imp_intro_r_inv A Γ C :
   A :: Γ ⟹ C.
 Proof.
   move => H.
-  pcut (A ⊃ C). by pweak 0. pimpL 0; passum.
+  apply (S_cut (A ⊃ C) []). by pweak 0. pimpL 0; passum.
 Qed.
 
 Lemma proper_concl C A B B' :
@@ -787,8 +856,8 @@ Lemma proper_concl C A B B' :
   A ⊃ (C ∨ B) ⟺ A ⊃ (C ∨ B').
 Proof.
   move => H. eqd.
-  pimpL 1; isrch. L. R. permute A. apply imp_intro_r_inv. rewrite -H. isrch.
-  pimpL 1; isrch. L. R. permute A. apply imp_intro_r_inv. rewrite H. isrch.
+  pimpL 1; isrch. L. R. apply imp_intro_r_inv. rewrite -H. isrch.
+  pimpL 1; isrch. L. R. apply imp_intro_r_inv. rewrite H. isrch.
 Qed.
 
 End Tautos.
@@ -799,5 +868,5 @@ Lemma contraction_cut A Γ C :
   A :: A :: Γ ⟹ C ->
   A :: Γ ⟹ C.
 Proof.
-  move => H. pcut A. apply S_ax. exact H.
+  move => H. apply (S_cut A []). apply S_ax. exact H.
 Qed.

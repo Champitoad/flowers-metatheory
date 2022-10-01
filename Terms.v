@@ -87,3 +87,80 @@ Fixpoint tunshift (n : nat) (c : nat) (t : term) : term :=
   | TVar m => TVar (if m <? c then m else m - n)
   | TFun f args => TFun f (tunshift n c <$> args)
   end.
+
+
+Lemma tsubst_tshift c m t :
+  tsubst c (TVar (c + m)) (tshift m (S c) t) = tshift m c t.
+Proof.
+  induction t using term_induction; simpl.
+  * case n, c eqn:?; simpl; auto.
+    case (S n <? S (S n0)) eqn:?.
+    case (n <? n0) eqn:?; simpl.
+    assert (S n <? S n0 = true).
+    { Search (_ <? _ = true).
+      rewrite Nat.ltb_lt in Heqb0.
+      apply lt_n_S in Heqb0.
+      rewrite -Nat.ltb_lt in Heqb0.
+      auto. }
+    rewrite H.
+    assert (n0 =? n = false).
+    { Search "ltb_lt".
+      apply Nat.ltb_lt in Heqb0.
+      apply Nat.lt_neq in Heqb0.
+      apply Nat.neq_sym in Heqb0.
+      by apply Nat.eqb_neq in Heqb0. }
+    by rewrite H0.
+    case (n0 =? n) eqn:?.
+    apply Nat.eqb_eq in Heqb1.
+    rewrite Heqb1.
+    assert (S n <? S n = false).
+    { by apply Nat.ltb_irrefl. }
+    by rewrite H.
+    assert (S n <? S n0 = false).
+    { apply Nat.ltb_nlt.
+      apply Nat.ltb_nlt in Heqb0.
+      intro; destruct Heqb0.
+      Search (S _ < S _ -> _ < _).
+      by apply lt_S_n. }
+    rewrite H.
+    apply Nat.ltb_nlt in Heqb0.
+    apply Nat.eqb_neq in Heqb1.
+    assert (n <= n0).
+    { apply Nat.ltb_lt in Heqb. lia. }
+    Search (_ <= _ -> _ \/ _).
+    apply le_lt_or_eq in H0.
+    intuition. by symmetry in H1.
+    assert (S n <? S n0 = false).
+    { apply Nat.ltb_nlt in Heqb.
+      pose proof (Nat.lt_lt_succ_r (S n) (S n0)).
+      pose proof (contrapose H).
+      apply Nat.ltb_nlt. by apply H0. }
+    rewrite H.
+    destruct m eqn:?; simpl.
+    repeat rewrite Nat.add_0_r.
+    destruct (n0 =? n) eqn:?; auto.
+    apply Nat.eqb_eq in Heqb0.
+    by rewrite Heqb0.
+    assert (n0 =? n + (S n1) = false).
+    { apply Nat.eqb_neq. intro.
+      rewrite H0 in H.
+      apply Nat.ltb_nlt in H.
+      lia. }
+    by rewrite H0.
+  * apply Forall_eq_map in H. rewrite -list_fmap_compose.
+    by rewrite H.
+Qed.
+
+Lemma tunshift_tshift m c t :
+  tunshift m c (tshift m c t) = t.
+Proof.
+  induction t using term_induction; simpl.
+  * f_equal.
+    destruct (n <? c) eqn:?. by rewrite Heqb.
+    assert (n + m <? c = false).
+    { apply Nat.ltb_nlt.
+      apply Nat.ltb_nlt in Heqb. lia. }
+    rewrite H. lia.
+  * apply Forall_eq_map in H. rewrite -list_fmap_compose.
+    rewrite map_id_ext in H. by rewrite H.
+Qed.
