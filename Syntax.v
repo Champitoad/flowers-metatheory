@@ -12,8 +12,7 @@ Inductive flower :=
 with garden :=
 | Garden (n : nat) (Φ : list flower).
 
-Definition ftol : flower -> list flower := fun ϕ => [ϕ].
-Coercion ftol : flower >-> list.
+Definition bouquet := list flower.
 
 Definition ftog : flower -> garden := fun ϕ => Garden 0 [ϕ].
 Coercion ftog : flower >-> garden.
@@ -35,7 +34,7 @@ Definition flower_induction_full :
     (IHatom : ∀ p args, Forall Pt args -> P (Atom p args))
     (IHflower : ∀ (γ : garden) (Δ : list garden),
       Pγ γ -> Forall Pγ Δ -> P (γ ⊢ Δ))
-    (IHgarden : ∀ (n : nat) (Φ : list flower),
+    (IHgarden : ∀ (n : nat) (Φ : bouquet),
       Forall P Φ -> Pγ (n ⋅ Φ)),
   ∀ (ϕ : flower), P ϕ.
 Proof.
@@ -60,7 +59,7 @@ Definition garden_induction_full :
   (IHflower : ∀ (γ : garden) (Δ : list garden),
     P γ -> Forall P Δ -> P (γ ⊢ Δ))
   (IHnil : ∀ n, P (n ⋅ []))
-  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : list flower),
+  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : bouquet),
     P ϕ -> P (n ⋅ Φ) -> P (n ⋅ ϕ :: Φ)),
   ∀ (γ : garden), P γ.
 Proof.
@@ -94,7 +93,7 @@ Definition garden_induction	:
   (IHflower : ∀ (γ : garden) (Δ : list garden),
     P γ -> Forall P Δ -> P (γ ⊢ Δ))
   (IHnil : ∀ n, P (n ⋅ []))
-  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : list flower),
+  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : bouquet),
     P ϕ -> P (n ⋅ Φ) -> P (n ⋅ ϕ :: Φ)),
   ∀ (γ : garden), P γ.
 Proof.
@@ -159,15 +158,11 @@ Qed.
 
 (** * Contexts *)
 
-Inductive fctx :=
+Inductive ctx :=
 | Hole
-| Pistil (G : gctx) (Δ : list garden)
-| Petal (γ : garden) (Δ : list garden) (G : gctx) (Δ' : list garden)
-with gctx :=
-| Planter (n : nat) (Φ : list flower) (F : fctx) (Φ' : list flower).
-
-Definition FtoG (F : fctx) := Planter 0 [] F [].
-Coercion FtoG : fctx >-> gctx.
+| Planter (Φ : bouquet) (X : ctx) (Φ' : bouquet)
+| Pistil (n : nat) (X : ctx) (Δ : list garden)
+| Petal (γ : garden) (Δ : list garden) (n : nat) (X : ctx) (Δ' : list garden).
 
 Notation "□" := Hole.
 
@@ -175,50 +170,7 @@ Notation "□" := Hole.
 
 Section Induction.
 
-Scheme f_ctx_ind := Induction for fctx Sort Prop
-  with g_ctx_ind := Induction for gctx Sort Prop.
-
-Section Flower.
-
-Context (P : fctx -> Prop).
-
-Definition Pgarden G :=
-  match G with
-  | Planter _ _ F _ => P F
-  end.
-
-Context
-  (IHHole : P Hole)
-  (IHPistil : ∀ G, Pgarden G -> ∀ Δ, P (Pistil G Δ))
-  (IHPetal : ∀ G, Pgarden G -> ∀ γ Δ Δ', P (Petal γ Δ G Δ')).
-
-Definition fctx_induction : ∀ F, P F.
-Proof.
-  eapply f_ctx_ind; eauto.
-Qed.
-
-End Flower.
-
-Section Garden.
-
-Context (P : gctx -> Prop).
-
-Definition Pflower F :=
-  match F with
-  | Hole => True
-  | Pistil G _
-  | Petal _ _ G _ => P G
-  end.
-
-Context
-  (IHPlanter : ∀ F, Pflower F -> ∀ n Φ Φ', P (Planter n Φ F Φ')).
-
-Definition gctx_induction : ∀ G, P G.
-Proof.
-  eapply g_ctx_ind; eauto; easy.
-Qed.
-
-End Garden.
+Check ctx_ind.
 
 End Induction.
 
@@ -226,65 +178,45 @@ End Induction.
 
 (** *** Compute the number of variables bound in a given context *)
 
-Fixpoint fbv (F : fctx) : nat :=
-  match F with
+Fixpoint bv (X : ctx) : nat :=
+  match X with
   | Hole => 0
-  | Pistil G _ => gbv G
-  | Petal (n ⋅ _) _ G _ => n + gbv G
-  end
-with gbv (G : gctx) : nat :=
-  match G with
-  | Planter n _ F _ => n + fbv F
+  | Planter _ X _ => bv X
+  | Pistil n X _ => n + bv X
+  | Petal (n ⋅ _) _  m X _ => n + m + bv X
   end.
 
 (** ** Context operations *)
 
-Reserved Notation "G ⋖ Ψ" (at level 15).
-Reserved Notation "F ⋖f Ψ" (at level 15).
+Reserved Notation "X ⋖ Ψ" (at level 15).
 
-Fixpoint ffill (Ψ : list flower) (F : fctx) : list flower :=
-  match F with
+Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
+  match X with
   | Hole => Ψ
-  | Pistil G Δ => [(G ⋖ Ψ) ⊢ Δ]
-  | Petal γ Δ G Δ' => [γ ⊢ Δ ++ [G ⋖ Ψ] ++ Δ']
+  | Planter Φ X Φ' => Φ ++ X ⋖ Ψ ++ Φ'
+  | Pistil n X Δ => [n ⋅ X ⋖ Ψ ⊢ Δ]
+  | Petal γ Δ n X Δ' => [γ ⊢ Δ ++ [n ⋅ X ⋖ Ψ] ++ Δ']
   end
-with gfill (Ψ : list flower) (G : gctx) : garden :=
-  match G with
-  | Planter n Φ F Φ' => n ⋅ Φ ++ (F ⋖f Ψ) ++ Φ'
+where "X ⋖ Ψ" := (fill Ψ X).
+
+Definition Xtob X := X ⋖ [].
+Coercion Xtob : ctx >-> bouquet.
+
+Definition fillac Ψ X :=
+  X ⋖ (fshift (bv X) 0 <$> Ψ).
+
+Notation "X ⋖! Ψ" := (fillac Ψ X) (at level 15).
+
+Reserved Infix "⪡" (at level 15).
+
+Fixpoint comp (X : ctx) (Y : ctx) : ctx :=
+  match X with
+  | Hole => Y
+  | Planter Φ X Φ' => Planter Φ (X ⪡ Y) Φ
+  | Pistil n X Δ => Pistil n (X ⪡ Y) Δ
+  | Petal γ Δ n X Δ' => Petal γ Δ n (X ⪡ Y) Δ'
   end
-where "G ⋖ Ψ" := (gfill Ψ G)
-  and "F ⋖f Ψ" := (ffill Ψ F).
-
-Definition Ftof F := F ⋖f [].
-Coercion Ftof : fctx >-> list.
-
-Definition Gtog G := G ⋖ [].
-Coercion Gtog : gctx >-> garden.
-
-Definition ffillac Ψ F :=
-  F ⋖f (fshift (fbv F) 0 <$> Ψ).
-
-Definition gfillac Ψ G :=
-  G ⋖ (fshift (gbv G) 0 <$> Ψ).
-
-Notation "F ⋖f! Ψ" := (ffillac Ψ F) (at level 15).
-Notation "G ⋖! Ψ" := (gfillac Ψ G) (at level 15).
-
-Reserved Infix "⪡f" (at level 15).
-Reserved Infix "⪡g" (at level 15).
-
-Fixpoint fcomp (F0 : fctx) (F : fctx) : fctx :=
-  match F with
-  | Hole => F0
-  | Pistil G Δ => Pistil (G ⪡g F0) Δ
-  | Petal γ Δ G Δ' => Petal γ Δ (G ⪡g F0) Δ'
-  end
-with gcomp (F0 : fctx) (G : gctx) : gctx :=
-  match G with
-  | Planter n Φ F Φ' => Planter n Φ (F ⪡f F0) Φ'
-  end
-where "G ⪡g F0" := (gcomp F0 G)
-  and "F ⪡f F0" := (fcomp F0 F).
+where "X ⪡ Y" := (comp X Y).
 
 (** ** Path operations *)
 
@@ -300,129 +232,100 @@ Definition path := list nat.
 
 (** *** Compute the context and subobject associated to a path *)
 
-Fixpoint fpath (p : path) (ϕ : flower) : option (fctx * flower) :=
+Fixpoint bpath p Φ : option (ctx * bouquet) :=
   match p with
-  | [] => Some (Hole, ϕ)
-  | i :: p => match ϕ with
-      | γ ⊢ Δ => match i with
+  | [] => Some (Hole, Φ)
+  | i :: p =>
+      lr ← split_at i Φ;
+      let '(Φ, Φ') := lr in
+      match Φ' with
+      | ϕ :: Φ' =>
+          XΨ ← fpath p ϕ;
+          let '(X, Ψ) := XΨ in
+          Some (Planter Φ X Φ', Ψ)
+      | _ => None
+      end
+  end
+with fpath p ϕ :=
+  match p with
+  | [] => Some (Hole, [ϕ])
+  | i :: p =>
+      match ϕ with
+      | γ ⊢ Δ =>
+          match i with
           | 0 =>
-              Gψ ← gpath p γ;
-              let '(G, ψ) := Gψ in
-              Some (Pistil G Δ, ψ)
+              let '(n ⋅ Φ) := γ in
+              XΨ ← bpath p Φ;
+              let '(X, Ψ) := XΨ in
+              Some (Pistil n X Δ, Ψ)
           | _ =>
               lr ← split_at (i - 1) Δ;
               let '(Δ, Δ') := lr in
               match Δ' with
-              | δ :: Δ' =>
-                  Gψ ← gpath p δ;
-                  let '(G, ψ) := Gψ in
-                  Some (Petal γ Δ G Δ', ψ)
+              | (n ⋅ Φ) :: Δ' =>
+                  XΨ ← bpath p Φ;
+                  let '(X, Ψ) := XΨ in
+                  Some (Petal γ Δ n X Δ', Ψ)
               | _ => None
               end
           end
       | _ => None
       end
-  end
-with gpath (p : path) (γ : garden) : option (gctx * flower) :=
-  match p with
-  | [] => None
-  | i :: p => match γ with
-      | n ⋅ Φ =>
-          lr ← split_at i Φ;
-          let '(Φ, Ψ) := lr in
-          match Ψ with
-          | ψ :: Ψ =>
-              Fϕ ← fpath p ψ;
-              let '(F, ϕ) := Fϕ in
-              Some (Planter n Φ F Ψ, ϕ)
-          | _ => None
-          end
-      end
   end.
 
 (** *** Retrieve subobjects *)
 
-Definition fget (p : path) (ϕ : flower) : option flower :=
-  X ← fpath p ϕ;
-  let '(_, ψ) := X in
-  Some ψ.
-
-Definition gget (p : path) (γ : garden) : option flower :=
-  X ← gpath p γ;
-  let '(_, ϕ) := X in
-  Some ϕ.
+Definition bget (p : path) (Φ : bouquet) : option bouquet :=
+  _Ψ ← bpath p Φ;
+  let '(_, Ψ) := _Ψ in
+  Some Ψ.
 
 (** *** Modify subobjects *)
 
-Definition fset (Ψ : list flower) (p : path) (ϕ : flower) : option (list flower) :=
-  X ← fpath p ϕ;
-  let '(F, _) := X in
-  Some (F ⋖f Ψ).
-
-Definition gset (Ψ : list flower) (p : path) (γ : garden) : option garden :=
-  X ← gpath p γ;
-  let '(G, _) := X in
-  Some (G ⋖ Ψ).
+Definition bset (Ψ : bouquet) (p : path) (Φ : bouquet) : option bouquet :=
+  X_ ← bpath p Φ;
+  let '(X, _) := X_ in
+  Some (X ⋖ Ψ).
 
 Open Scope string_scope.
-Compute λ ϕ : flower, gset [] [0; 1; 0] (0 ⋅ [(∅ ⊢ [0 ⋅ [ϕ]]); Atom "c" []]).
+Compute λ ϕ : flower, bset [] [1] [∅ ⊢ [(0 ⋅ [ϕ; Atom "a" []]); (4 ⋅ [Atom "c" []])]].
 Close Scope string_scope.
 
 (** * Rules *)
 
-Reserved Notation "ϕ ≺s G 'in' F" (at level 80).
-Reserved Notation "ϕ ≺w F 'in' G" (at level 80).
+Reserved Notation "ϕ ≺ n 'in' X" (at level 80).
 
-Inductive spol : flower -> gctx -> fctx -> Prop :=
-| P_self ϕ G n Φ Φ' Δ Δ' :
-  ϕ ≺s G in (Petal (n ⋅ Φ ++ [ϕ] ++ Φ') Δ G Δ')
-with wpol : flower -> fctx -> gctx -> Prop :=
-| P_wind_l ϕ F n Φ Φ' Φ'' :
-  ϕ ≺w F in (Planter n Φ'' F (Φ ++ [ϕ] ++ Φ'))
-| P_wind_r ϕ F n Φ Φ' Φ'' :
-  ϕ ≺w F in (Planter n (Φ ++ [ϕ] ++ Φ') F Φ'')
-where "ϕ ≺s G 'in' F" := (spol ϕ G F)
-  and "ϕ ≺w F 'in' G" := (wpol ϕ F G).
+Inductive pollin : flower -> nat -> ctx -> Prop :=
+| P_self ϕ X n Φ Φ' Δ m Δ' :
+  ϕ ≺ (m + bv X) in (Petal (n ⋅ Φ ++ [ϕ] ++ Φ') Δ m X Δ')
+| P_wind_l ϕ X Φ Φ' Φ'' :
+  ϕ ≺ (bv X) in (Planter Φ'' X (Φ ++ [ϕ] ++ Φ'))
+| P_wind_r ϕ X Φ Φ' Φ'' :
+  ϕ ≺ (bv X) in (Planter (Φ ++ [ϕ] ++ Φ') X Φ'')
+where "ϕ ≺ n 'in' X" := (pollin ϕ n X).
 
-Definition fassum (ϕ : flower) (F : fctx) :=
-  ∃ F0, (∃ G1 F1, ϕ ≺s G1 in F1 /\ F =@{list flower} F0 ⋖f F1)
-     \/ (∃ F1 n Φ Φ', ϕ ≺w F1 in (Planter n Φ F1 Φ')
-         /\ F =@{list flower} F0 ⋖f (Φ ++ F1 ++ Φ')).
+Definition assum (ϕ : flower) (X : ctx) :=
+  ∃ X0 n X1, ϕ ≺ n in X1 /\ X = X0 ⪡ X1.
 
-Definition gassum (ϕ : flower) (G : gctx) :=
-  ∃ G0, (∃ G1 F1, ϕ ≺s G1 in F1 /\ G =@{garden} G0 ⋖ F1)
-     \/ (∃ F1 n Φ Φ', ϕ ≺w F1 in (Planter n Φ F1 Φ')
-         /\ G =@{garden} G0 ⋖ (Φ ++ F1 ++ Φ')).
-
-Notation "ϕ ∈ G" := (gassum ϕ G).
+Notation "ϕ ∈ X" := (assum ϕ X).
 
 (** ** Local rules *)
 
 Reserved Infix "⇀" (at level 80).
 
-Inductive step : list flower -> list flower -> Prop :=
+Inductive step : bouquet -> bouquet -> Prop :=
 
 (** *** Pollination *)
 
-| R_spol ϕ G F :
-  ϕ ≺s G in F ->
-  F ⋖f [fshift (gbv G) 0 ϕ] ⇀
-  F ⋖f []
+| R_pol ϕ n X :
+  ϕ ≺ n in X ->
+  X ⋖ [fshift n 0 ϕ] ⇀
+  X ⋖ []
 
-| R_co_spol ϕ G F :
-  ϕ ≺s G in F ->
-  F ⋖f [] ⇀ 
-  F ⋖f [fshift (gbv G) 0 ϕ]
-
-| R_wpol ϕ F n Φ F0 Φ' :
-  ϕ ≺w F in (Planter n Φ F0 Φ') ->
-  G ⋖ [fshift (fbv F) 0 ϕ] ⇀
-  G ⋖ []
-
-| R_co_wpol ϕ F G :
-  ϕ ≺w F in G ->
-  G ⋖ [] ⇀ 
-  G ⋖ [fshift (fbv F) 0 ϕ]
+| R_co_pol ϕ n X :
+  ϕ ≺ n in X ->
+  X ⋖ [] ⇀
+  X ⋖ [fshift n 0 ϕ]
 
 (** *** Empty pistil *)
 
@@ -470,21 +373,21 @@ where "Φ ⇀ Ψ" := (step Φ Ψ).
 
 Reserved Infix "~>" (at level 80).
 
-Inductive gstep : garden -> garden -> Prop :=
+Inductive cstep : bouquet -> bouquet -> Prop :=
 
 (** *** Congruence *)
 
-| R_ctx (G : gctx) (Φ Ψ : list flower) :
+| R_ctx (X : ctx) (Φ Ψ : bouquet) :
   Φ ⇀ Ψ ->
-  G ⋖ Φ ~> G ⋖ Φ
+  X ⋖ Φ ~> X ⋖ Ψ
 
-where "γ ~> δ" := (gstep γ δ).
+where "Φ ~> Ψ" := (cstep Φ Ψ).
 
 (** ** Transitive closure *)
 
-Infix "~>*" := (rtc gstep) (at level 80).
+Infix "~>*" := (rtc cstep) (at level 80).
 
-Notation "γ <~> δ" := (γ ~>* δ /\ δ ~>* γ) (at level 80).
+Notation "Φ <~> Ψ" := (Φ ~>* Ψ /\ Ψ ~>* Φ) (at level 80).
 
 (** * Basic proof search *)
 
@@ -492,23 +395,23 @@ Notation "γ <~> δ" := (γ ~>* δ /\ δ ~>* γ) (at level 80).
 
 Ltac sub_at p :=
   match goal with
-  | |- ?γ ~>* _ => eval cbn in (gget p γ)
+  | |- ?γ ~>* _ => eval cbn in (bget p γ)
   end.
 
 Ltac rstep δ :=
-  apply (rtc_l gstep _ δ).
+  apply (rtc_l cstep _ δ).
 
 Ltac rstepm p δ :=
   match goal with
   | |- ?γ ~>* _ =>
-      let γ' := eval cbn in (gset p δ γ) in
+      let γ' := eval cbn in (bset p δ γ) in
       rstep γ'; list_simplifier
   end.
 
 Ltac rstepm_cons p i δ :=
   match goal with
   | |- ?γ ~>* _ =>
-      let γΣ := eval cbn in (gpath p γ) in
+      let γΣ := eval cbn in (bpath p γ) in
       match γΣ with
       | Some (?γ, ?n ⋅ ?Σ1 :: ?Σ2) =>
           match i with
@@ -521,7 +424,7 @@ Ltac rstepm_cons p i δ :=
 Ltac rstepm_app p i δ :=
   match goal with
   | |- ?γ ~>* _ =>
-      let γΣ := eval cbn in (gpath p γ) in
+      let γΣ := eval cbn in (bpath p γ) in
       match γΣ with
       | Some (?γ, ?n ⋅ ?Σ1 ++ ?Σ2) =>
           match i with
@@ -534,15 +437,15 @@ Ltac rstepm_app p i δ :=
 Ltac rtransm p δ :=
   match goal with
   | |- ?γ ~>* _ =>
-      let γ' := eval cbn in (gset p δ γ) in
+      let γ' := eval cbn in (bset p δ γ) in
       transitivity γ'; list_simplifier
   end.
 
 Lemma fill_hole Ψ :
-  □ ⋖ Ψ = 0 ⋅ Ψ.
+  □ ⋖ Ψ = Ψ.
 Proof.
-  Fail reflexivity.
-Admitted.
+  reflexivity.
+Qed.
 
 Ltac rctx γ γ δ :=
   let H := fresh "H" in
@@ -553,8 +456,8 @@ Ltac rctx γ γ δ :=
 Ltac rctxm p :=
   match goal with
   | |- ?γ ⇀ ?δ =>
-      let spγ := eval cbn in (gpath p γ) in
-      let spδ := eval cbn in (gpath p δ) in
+      let spγ := eval cbn in (bpath p γ) in
+      let spδ := eval cbn in (bpath p δ) in
       match spγ with
       | Some (?γ, ?γ0) =>
           match spδ with
@@ -567,7 +470,7 @@ Ltac rctxm p :=
 Ltac rcstepm p δ :=
   match goal with
   | |- ?γ ~>* _ =>
-      let spγ := eval cbn in (gpath p γ) in
+      let spγ := eval cbn in (bpath p γ) in
       match spγ with
       | Some (?γ, ?γ0) =>
           rstepm p δ; [> rctx γ γ0 δ | ..]
@@ -577,8 +480,8 @@ Ltac rcstepm p δ :=
 Ltac rctxmt p δ0 :=
   match goal with
   | |- ?γ ~>* ?δ =>
-      let spγ := eval cbn in (gpath p γ) in
-      let spδ := eval cbn in (gpath p δ) in
+      let spγ := eval cbn in (bpath p γ) in
+      let spδ := eval cbn in (bpath p δ) in
       match spγ with
       | Some (?γ, ?γ0) =>
           let H := fresh "H" in
@@ -612,7 +515,7 @@ Ltac rwpol γ γ :=
 Ltac rwpolm p :=
   match goal with
   | |- ?n ⋅ ?γ ++ ?δ ⇀ _ =>
-      let spδ := eval cbn in (gpath p (n ⋅ δ)) in
+      let spδ := eval cbn in (bpath p (n ⋅ δ)) in
       match spδ with
       | Some (?γ, _) =>
           rwpol γ (n ⋅ γ)
@@ -631,7 +534,7 @@ Ltac rspol γ γ δ Δ :=
 Ltac rspolm p :=
   match goal with
   | |- ?γ ⇀ _ =>
-      let spγ := eval cbn in (gpath p γ) in
+      let spγ := eval cbn in (bpath p γ) in
       match spγ with
       | Some (Planter [] (Petal ?γ' [] ?γ ?Δ') [], ?δ) =>
           rspol γ γ' ∅ Δ'
@@ -703,7 +606,7 @@ Admitted. *)
 Open Scope string_scope.
 
 Example deriv_contraction :
-  0 ⋅ [Atom "a" []; Atom "b" []] ~>* 0 ⋅ [Atom "a" []; Atom "b" []; Atom "b" []].
+  [Atom "a" []; Atom "b" []] ~>* [Atom "a" []; Atom "b" []; Atom "b" []].
 Proof.
   apply rtc_once.
 Admitted.
