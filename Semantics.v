@@ -179,6 +179,21 @@ Proof.
     assert (H : c + m + 1 = c + 1 + m). { lia. } by rewrite H.
 Qed.
 
+Lemma fsubst_fshift_vacuous A : ∀ n u m c,
+  n < m ->
+  fsubst (n + c) u (fshift m c A) = fshift m c A.
+Proof.
+  induction A; intros; simpl; auto; try by rewrite (IHA1 n u m c H) (IHA2 n u m c H).
+  * induction args; auto. list_simplifier.
+    f_equal. f_equal; auto. by apply (tsubst_tshift_vacuous n u m c).
+  * epose proof (IH := IHA n (tshift 1 0 u) m (c + 1) _).
+    f_equal. assert (Ha : n + c + 1 = n + (c + 1)). { lia. } by rewrite Ha.
+  * epose proof (IH := IHA n (tshift 1 0 u) m (c + 1) _).
+    f_equal. assert (Ha : n + c + 1 = n + (c + 1)). { lia. } by rewrite Ha.
+  Unshelve.
+  all: auto.
+Qed.
+
 Lemma funshift_fshift A : ∀ n c,
   funshift n c (fshift n c A) = A.
 Proof.
@@ -885,6 +900,31 @@ Proof.
   by rewrite fshift_zero.
   rewrite wpol_exists.
   apply proper_exists.
+  rewrite IH.
+  rewrite [_ (S n) _ _]fshift_succ.
+  by rewrite fshift_comm.
+Qed.
+
+Lemma wpol_forall A B :
+  A ∧ #∀ B ⟺ #∀ ((fshift 1 0 A) ∧ B).
+Proof.
+  eqd.
+  * pfaL 1 (TVar 0).
+    repeat rewrite fsubst_fshift funshift_fshift. isrch.
+  * pfaL 0 (TVar 0).
+    rewrite (fsubst_fshift_vacuous A 0 _ 1 0); [> lia | ..].
+    rewrite funshift_fshift. isrch.
+  * pfaL 0 (TVar 0).
+    repeat rewrite fsubst_fshift funshift_fshift. isrch.
+Qed.
+
+Lemma wpol_nforall n : ∀ A B,
+  A ∧ n#∀ B ⟺ n#∀ ((fshift n 0 A) ∧ B).
+Proof.
+  elim: n => [A B |n IH A B] //=.
+  by rewrite fshift_zero.
+  rewrite wpol_forall.
+  apply proper_forall.
   rewrite IH.
   rewrite [_ (S n) _ _]fshift_succ.
   by rewrite fshift_comm.

@@ -194,6 +194,23 @@ Proof.
     by rewrite H.
 Qed.
 
+Lemma tsubst_tshift_vacuous n u m c t :
+  n < m ->
+  tsubst (n + c) u (tshift m c t) = tshift m c t.
+Proof.
+  intros H.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n0 <? c) eqn:Heqb.
+    - assert (Hnc : n + c =? n0 = false).
+      { apply Nat.eqb_neq. apply Nat.ltb_lt in Heqb. lia. }
+      by rewrite Hnc.
+    - assert (Hnc : n + c =? n0 + m = false).
+      { apply Nat.eqb_neq. apply Nat.ltb_nlt in Heqb. lia. }
+      by rewrite Hnc.
+  * apply Forall_eq_map in IH. rewrite -list_fmap_compose.
+    by rewrite IH.
+Qed.
+
 Lemma tunshift_tshift m c t :
   tunshift m c (tshift m c t) = t.
 Proof.

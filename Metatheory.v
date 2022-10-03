@@ -31,17 +31,31 @@ Notation "⟦ Φ ⟧" := (interp Φ) (format "⟦ Φ ⟧").
   | Hole => CHole
   | Planter Φ X Φ' =>  *)
 
-Lemma wpol (ϕ : flower) X :
-  ⟦ϕ⟧ ∧ ⟦X ⋖ shift (bv X) 0 ϕ⟧ ⟺
-  ⟦ϕ⟧ ∧ ⟦X ⋖ []⟧.
-Proof.
-  induction X.
-Admitted.
-
 Lemma fshift_shift n c (ϕ : flower) :
   fshift n c ⟦ϕ⟧ = ⟦shift n c ϕ⟧.
 Proof.
   elim/flower_induction: ϕ.
+Admitted.
+
+Lemma wpol X : ∀ (ϕ : flower),
+  ⟦ϕ⟧ ∧ ⟦X ⋖ shift (bv X) 0 ϕ⟧ ⟺
+  ⟦ϕ⟧ ∧ ⟦X ⋖ []⟧.
+Proof.
+  induction X; intro;
+  rewrite /interp//=;
+  repeat rewrite true_and.
+  * rewrite shift_zero. eqd.
+  * repeat rewrite map_app And_app.
+    rewrite and_assoc [(⌊ϕ⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⌊ϕ⌋) ∧ _]and_assoc.
+    pose proof (IH := IHX ϕ); rewrite /interp/= true_and in IH.
+    rewrite IH; eqd.
+  * repeat rewrite wpol_nforall; apply proper_nforall; auto.
+    repeat rewrite [_ ∧ (⋀ _ ⊃ _)]wpol_imp_l; apply proper_and; auto.
+    apply proper_imp; auto.
+    pose proof (IH := IHX (shift n 0 ϕ)).
+    rewrite -fshift_shift shift_comm -shift_add /interp/= true_and in IH.
+    by rewrite IH.
+  * admit.
 Admitted.
 
 Lemma pollination (X : ctx) : ∀ (ϕ : flower) (n : nat),
