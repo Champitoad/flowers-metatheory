@@ -8,17 +8,19 @@ Require Import Flowers.Terms Flowers.Utils.
 
 Inductive flower :=
 | Atom (p : name) (args : list term)
-| Flower (γ : garden) (Δ : list garden)
-with garden :=
-| Garden (n : nat) (Φ : list flower).
+| Flower (γ : nat * list flower) (Δ : list (nat * list flower)).
 
+Definition garden : Type := nat * list flower.
 Definition bouquet := list flower.
 
-Definition ftog : flower -> garden := fun ϕ => Garden 0 [ϕ].
+Definition ftog : flower -> garden := λ ϕ, (0, [ϕ]).
 Coercion ftog : flower >-> garden.
 
-Notation "∅" := (Garden 0 nil).
-Notation "n ⋅ Φ" := (Garden n Φ) (format "n  ⋅  Φ", at level 63).
+Definition ftob : flower -> bouquet := λ ϕ, [ϕ].
+Coercion ftob : flower >-> bouquet.
+
+Notation "∅" := (0, nil).
+Notation "n ⋅ Φ" := (n, Φ) (format "n  ⋅  Φ", at level 63).
 
 Notation "γ ⊢ Δ" := (Flower γ Δ) (at level 65).
 Notation "γ ⊢" := (Flower γ nil) (at level 65).
@@ -44,35 +46,10 @@ Proof.
     - case: γ => n Φ.
       apply IHgarden.
       elim: Φ => [|ϕ Φ IHΦ] //.
-      decompose_Forall; auto.
     - elim: Δ => [|δ Δ IHΔ] //.
       decompose_Forall; auto.
       case δ => n Φ. apply IHgarden; auto.
       decompose_Forall; auto.
-Qed.
-
-Definition garden_induction_full :
-  ∀ (P : garden -> Prop)
-    (Pt : term -> Prop)
-  (IHt : ∀ (t : term), Pt t)
-  (IHatom : ∀ p args, Forall Pt args -> P (Atom p args))
-  (IHflower : ∀ (γ : garden) (Δ : list garden),
-    P γ -> Forall P Δ -> P (γ ⊢ Δ))
-  (IHnil : ∀ n, P (n ⋅ []))
-  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : bouquet),
-    P ϕ -> P (n ⋅ Φ) -> P (n ⋅ ϕ :: Φ)),
-  ∀ (γ : garden), P γ.
-Proof.
-  intros. move: γ. fix IH 1. induction γ.
-  elim: Φ => [|ϕ Φ IHΦ].
-  by apply: IHnil.
-  apply: IHcons.
-  - elim: ϕ => [p args |γ Δ].
-    + apply IHatom. apply In_Forall. intros. by apply IHt.
-    + apply IHflower.
-        exact: IH.
-        decompose_Forall.
-  - exact: IHΦ.
 Qed.
 
 Definition flower_induction	:
@@ -84,63 +61,62 @@ Definition flower_induction	:
   ∀ (ϕ : flower), P ϕ.
 Proof.
   intros. eapply flower_induction_full; eauto.
-  exact (fun _ => I).
-Qed.
-
-Definition garden_induction	:
-  ∀ (P : garden -> Prop)
-  (IHatom : ∀ p args, P (Atom p args))
-  (IHflower : ∀ (γ : garden) (Δ : list garden),
-    P γ -> Forall P Δ -> P (γ ⊢ Δ))
-  (IHnil : ∀ n, P (n ⋅ []))
-  (IHcons : ∀ (ϕ : flower) (n : nat) (Φ : bouquet),
-    P ϕ -> P (n ⋅ Φ) -> P (n ⋅ ϕ :: Φ)),
-  ∀ (γ : garden), P γ.
-Proof.
-  intros; eapply garden_induction_full; eauto.
-  exact (fun _ => I).
+  exact (λ _, I).
 Qed.
 
 (** ** Operations on De Bruijn indices *)
 
-Fixpoint fshift (n : nat) (c : nat) (ϕ : flower) : flower :=
+Fixpoint shift (n : nat) (c : nat) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tshift n c <$> args)
-  | m ⋅ Φ ⊢ Δ => m ⋅ fshift n (c + m) <$> Φ ⊢ gshift n (c + m) <$> Δ
-  end
-with gshift (n : nat) (c : nat) (γ : garden) : garden :=
-  match γ with
-  | m ⋅ Φ => m ⋅ fshift n (c + m) <$> Φ
+  | m ⋅ Φ ⊢ Δ =>
+      m ⋅ shift n (c + m) <$> Φ ⊢
+        ((λ '(k ⋅ Ψ), k ⋅ shift n (c + m + k) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
-Fixpoint funshift (n : nat) (c : nat) (ϕ : flower) : flower :=
+Definition gshift n c '(m ⋅ Φ) : garden :=
+  m ⋅ shift n (c + m) <$> Φ.
+
+Fixpoint unshift (n : nat) (c : nat) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tunshift n c <$> args)
-  | m ⋅ Φ ⊢ Δ => m ⋅ funshift n (c + m) <$> Φ ⊢ gunshift n (c + m) <$> Δ
-  end
-with gunshift (n : nat) (c : nat) (γ : garden) : garden :=
-  match γ with
-  | m ⋅ Φ => m ⋅ funshift n (c + m) <$> Φ
+  | m ⋅ Φ ⊢ Δ =>
+      m ⋅ unshift n (c + m) <$> Φ ⊢
+        ((λ '(k ⋅ Ψ), k ⋅ unshift n (c + m + k) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
-Lemma fshift_zero c : ∀ ϕ,
-  fshift 0 c ϕ = ϕ.
-Admitted.
+Definition gunshift n c '(m ⋅ Φ) : garden :=
+  m ⋅ unshift n (c + m) <$> Φ.
 
-Fixpoint fsubst (n : nat) (t : term) (ϕ : flower) : flower :=
+Fixpoint subst (n : nat) (t : term) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tsubst n t <$> args)
-  | m ⋅ Φ ⊢ Δ => m ⋅ fsubst (n+m) (tshift m 0 t) <$> Φ ⊢ gsubst (n+m) (tshift m 0 t) <$> Δ
-  end
-with gsubst (n : nat) (t : term) (γ : garden) : garden :=
-  match γ with
-  | m ⋅ Φ => m ⋅ fsubst (n+m) (tshift m 0 t) <$> Φ
+  | m ⋅ Φ ⊢ Δ =>
+      m ⋅ subst (n + m) (tshift m 0 t) <$> Φ ⊢
+        ((λ '(k ⋅ Ψ), k ⋅ subst (n + m + k) (tshift (m + k) 0 t) <$> Ψ) : garden -> garden) <$> Δ
   end.
+
+Definition gsubst n t '(m ⋅ Φ) : garden :=
+  m ⋅ subst (n + m) (tshift m 0 t) <$> Φ.
+
+Lemma shift_zero c : ∀ ϕ,
+  shift 0 c ϕ = ϕ.
+Admitted.
+
+Lemma shift_add c n m : ∀ ϕ,
+  shift (n + m) c ϕ = shift n c (shift m c ϕ).
+Admitted.
+
+Lemma shift_comm c n m ϕ :
+  shift n c (shift m c ϕ) = shift m c (shift n c ϕ).
+Proof.
+  by rewrite -shift_add Nat.add_comm shift_add.
+Qed.
 
 (** ** Juxtaposition of gardens *)
 
 Definition juxt '(n ⋅ Φ) '(m ⋅ Ψ) :=
-  (n + m) ⋅ (fshift m 0 <$> Φ) ++ (fshift n m <$> Ψ).
+  (n + m) ⋅ (shift m 0 <$> Φ) ++ (shift n m <$> Ψ).
 
 Definition Juxt : list garden -> garden :=
   foldr juxt ∅.
@@ -152,7 +128,7 @@ Lemma juxt_empty γ :
   ∅ ∪ γ = γ.
 Proof.
   case γ => n Φ //=.
-  pose proof (eq_map (fshift 0 n) id Φ (fshift_zero n)).
+  pose proof (eq_map (shift 0 n) id Φ (shift_zero n)).
   by rewrite H list_fmap_id.
 Qed.
 
@@ -199,11 +175,8 @@ Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
   end
 where "X ⋖ Ψ" := (fill Ψ X).
 
-Definition Xtob X := X ⋖ [].
-Coercion Xtob : ctx >-> bouquet.
-
 Definition fillac Ψ X :=
-  X ⋖ (fshift (bv X) 0 <$> Ψ).
+  X ⋖ (shift (bv X) 0 <$> Ψ).
 
 Notation "X ⋖! Ψ" := (fillac Ψ X) (at level 15).
 
@@ -319,30 +292,30 @@ Inductive step : bouquet -> bouquet -> Prop :=
 
 | R_pol ϕ n X :
   ϕ ≺ n in X ->
-  X ⋖ [fshift n 0 ϕ] ⇀
+  X ⋖ [shift n 0 ϕ] ⇀
   X ⋖ []
 
 | R_co_pol ϕ n X :
   ϕ ≺ n in X ->
   X ⋖ [] ⇀
-  X ⋖ [fshift n 0 ϕ]
+  X ⋖ [shift n 0 ϕ]
 
 (** *** Empty pistil *)
 
 | R_epis_pis m Ψ n Φ Φ' Δ :
   [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ] ⇀
-  [n + m ⋅ (fshift m 0 <$> Φ) ++ Ψ ++ (fshift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ)]
+  [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ]
 
 | R_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
   [γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'] ⇀
-  [γ ⊢ Δ ++ [n + m ⋅ (fshift m 0 <$> Φ) ++ Ψ ++ (fshift m 0 <$> Φ')] ++ Δ']
+  [γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ']
 
 | R_co_epis_pis m Ψ n Φ Φ' Δ :
-  [n + m ⋅ (fshift m 0 <$> Φ) ++ Ψ ++ (fshift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ)] ⇀
+  [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ)] ⇀
   [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ]
 
 | R_co_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  [γ ⊢ Δ ++ [n + m ⋅ (fshift m 0 <$> Φ) ++ Ψ ++ (fshift m 0 <$> Φ')] ++ Δ'] ⇀
+  [γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'] ⇀
   [γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ']
 
 (** *** Empty petal *)
@@ -361,11 +334,11 @@ Inductive step : bouquet -> bouquet -> Prop :=
 
 | R_ipis i t n Φ Δ :
   [n ⋅ Φ ⊢ Δ] ⇀
-  [n-1 ⋅ funshift 1 i <$> (fsubst i (tshift n 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift n 0 t) <$> Δ); n ⋅ Φ ⊢ Δ]
+  [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift n 0 t) <$> Δ); n ⋅ Φ ⊢ Δ]
 
 | R_ipet i t n Φ γ Δ Δ' :
   [γ ⊢ Δ ++ [n ⋅ Φ] ++ Δ] ⇀
-  [γ ⊢ Δ ++ [n-1 ⋅ funshift 1 i <$> (fsubst i (tshift n 0 t) <$> Φ); n ⋅ Φ] ++ Δ']
+  [γ ⊢ Δ ++ [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ); n ⋅ Φ] ++ Δ']
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
 
@@ -579,29 +552,6 @@ Ltac rpet :=
 
 Ltac rpetm p :=
   rcstepm p ∅; [> rpet | ..].
-
-(** ** Generalized rewriting *)
-
-(* Add Parametric Relation : garden itr
-  reflexivity proved by (rtc_refl cstep)
-  transitivity proved by rtc_transitive
-  as itr_preorder.
-
-Add Parametric Morphism : Flower with signature
-  itr ==> Forall2 itr ==> itr
-  as proper_itr_Flower.
-Proof.
-  intros γ δ Hpis Δ Δ' Hpet.
-  induction Hpis, Hpet; auto.
-Admitted.
-
-Add Parametric Morphism : Garden with signature
-  Forall2 (λ F G : flower, F ~>* G) ==> itr
-  as proper_itr_Garden.
-Proof.
-Admitted. *)
-
-(** ** Examples *)
 
 Open Scope string_scope.
 

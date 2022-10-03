@@ -10,6 +10,8 @@ Coercion string_to_name : string >-> name.
 
 (** * Tactics *)
 
+Ltac done := try ssreflect.done; solve [auto].
+
 Ltac inv H := inversion H; subst; clear H; try congruence.
 Ltac econs := econstructor; eauto; try congruence.
 
@@ -219,8 +221,14 @@ Proof.
   by f_equal.
 Qed.
 
-Lemma map_singl {A B} (x : A) (f : A -> B) :
+Lemma fmap_singl {A B} (x : A) (f : A -> B) :
   f <$> [x] = [f x].
+Proof.
+  reflexivity.
+Qed.
+
+Lemma map_singl {A B} (x : A) (f : A -> B) :
+  map f [x] = [f x].
 Proof.
   reflexivity.
 Qed.

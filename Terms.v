@@ -88,6 +88,49 @@ Fixpoint tunshift (n : nat) (c : nat) (t : term) : term :=
   | TFun f args => TFun f (tunshift n c <$> args)
   end.
 
+Lemma tshift_zero c : ∀ t,
+  tshift 0 c t = t.
+Proof.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n <? c); auto.
+  * f_equal. rewrite Forall_eq_map in IH.
+    by rewrite list_fmap_id in IH.
+Qed.
+
+Lemma tshift_succ c n : ∀ t,
+  tshift (S n) c t = tshift 1 c (tshift n c t).
+Proof.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n0 <? c) eqn:Heqb.
+    by rewrite Heqb.
+    assert (H : n0 + n <? c = false).
+    { rewrite Nat.ltb_nlt in Heqb.
+      apply Nat.ltb_nlt. lia. }
+    by rewrite H Nat.add_1_r Nat.add_succ_r.
+  * f_equal. rewrite Forall_eq_map in IH.
+    by rewrite (list_fmap_compose (tshift n c)) in IH.
+Qed.
+
+Lemma tshift_add c n m : ∀ t,
+  tshift (n + m) c t = tshift n c (tshift m c t).
+Proof.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n0 <? c) eqn:Heqb.
+    by rewrite Heqb.
+    assert (Hm : n0 + m <? c = false).
+    { rewrite Nat.ltb_nlt in Heqb.
+      apply Nat.ltb_nlt. lia. }
+    rewrite Hm.
+    by rewrite -Nat.add_assoc [m + n]Nat.add_comm Nat.add_assoc.
+  * f_equal. rewrite Forall_eq_map in IH.
+    by repeat rewrite (list_fmap_compose (tshift _ c)) in IH.
+Qed.
+
+Lemma tshift_comm c n m t :
+  tshift n c (tshift m c t) = tshift m c (tshift n c t).
+Proof.
+  by rewrite -tshift_add Nat.add_comm tshift_add.
+Qed.
 
 Lemma tsubst_tshift c m t :
   tsubst c (TVar (c + m)) (tshift m (S c) t) = tshift m c t.

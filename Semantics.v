@@ -120,6 +120,53 @@ Fixpoint fsubst (n : nat) (u : term) (A : form) : form :=
   | FExists A => FExists (fsubst (n+1) (tshift 1 0 u) A)
   end.
 
+
+
+Lemma fshift_zero : ∀ A c,
+  fshift 0 c A = A.
+Proof.
+  induction A using form_induction; intros c; simpl; auto.
+  * pose proof (H := eq_map (tshift 0 c) id args (tshift_zero c)).
+    by rewrite H list_fmap_id.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal. by rewrite IHA.
+  * f_equal. by rewrite IHA.
+Qed.
+
+Lemma fshift_succ : ∀ A c n,
+  fshift (S n) c A = fshift 1 c (fshift n c A).
+Proof.
+  induction A using form_induction; intros c n; simpl; auto.
+  * pose proof (H := eq_map (tshift (S n) c) _ args (tshift_succ c n)).
+    by rewrite H list_fmap_compose.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal. by rewrite IHA.
+  * f_equal. by rewrite IHA.
+Qed.
+
+Lemma fshift_add : ∀ A c n m,
+  fshift (n + m) c A = fshift n c (fshift m c A).
+Proof.
+  induction A using form_induction; intros c n m; simpl; auto.
+  * pose proof (H := eq_map (tshift (n + m) c) _ args (tshift_add c n m)).
+    by rewrite H list_fmap_compose.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal; done.
+  * f_equal. by rewrite IHA.
+  * f_equal. by rewrite IHA.
+Qed.
+
+Lemma fshift_comm A c n m :
+  fshift n c (fshift m c A) = fshift m c (fshift n c A).
+Proof.
+  by rewrite -fshift_add Nat.add_comm fshift_add.
+Qed.
+
 Lemma fsubst_fshift A : ∀ c m,
   fsubst c (TVar (c + m)) (fshift m (S c) A) = fshift m c A.
 Proof.
@@ -143,6 +190,37 @@ Proof.
   * by rewrite IHA.
   * by rewrite IHA.
 Qed.
+
+(** * Contexts *)
+
+(* Inductive fctx :=
+| Chole
+| CandL (X : fctx) (B : form)
+| CandR (B : form) (X : fctx)
+| CorL (X : fctx) (B : form)
+| CorR (B : form) (X : fctx)
+| CimpL (X : fctx) (B : form)
+| CimpR (B : form) (X : fctx)
+| Cforall (X : fctx)
+| Cexists (X : fctx).
+
+Fixpoint CAnd
+
+Reserved Notation "X {{ A }}" (at level 0).
+
+Fixpoint ffill (A : form) (X : fctx) : form :=
+  match X with
+  | Chole => A
+  | CandL X B => X{{A}} ∧ B
+  | CandR B X => B ∧ X{{A}}
+  | CorL X B => X{{A}} ∨ B
+  | CorR B X => B ∨ X{{A}}
+  | CimpL X B => X{{A}} ⊃ B
+  | CimpR B X => B ⊃ X{{A}}
+  | Cforall X => #∀ X{{A}}
+  | Cexists X => #∃ X{{A}}
+  end
+where "X {{ A }}" := (ffill A X). *)
 
 (** * Rules *)
 
@@ -434,28 +512,6 @@ Ltac eqd := split; isrch.
 Ltac pleft := apply S_R_or_l; isrch.
 Ltac pright := apply S_R_or_r; isrch.
 
-Lemma tshift_zero c : ∀ t,
-  tshift 0 c t = t.
-Proof.
-  induction t as [|?? IH] using term_induction; simpl.
-  * destruct (n <? c); auto.
-  * f_equal. rewrite Forall_eq_map in IH.
-    by rewrite list_fmap_id in IH.
-Qed.
-
-Lemma fshift_zero : ∀ A c,
-  fshift 0 c A = A.
-Proof.
-  induction A using form_induction; intros c; simpl; auto.
-  * pose proof (H := eq_map (tshift 0 c) id args (tshift_zero c)).
-    by rewrite H list_fmap_id.
-  * f_equal; done.
-  * f_equal; done.
-  * f_equal; done.
-  * f_equal. by rewrite IHA.
-  * f_equal. by rewrite IHA.
-Qed.
-
 (** * Generalized rewriting of equiderivable formulas *)
 
 Definition eqderiv (A B : form) : Prop :=
@@ -474,6 +530,8 @@ Proof.
 Qed.
 
 #[export] Instance : Equiv form := eqderiv.
+
+#[global] Hint Extern 1 (_ ⟺ _) => reflexivity : core.
 
 Add Morphism FAnd with signature
   eqderiv ==> eqderiv ==> eqderiv
@@ -629,14 +687,14 @@ Lemma eqderiv_Forall {A} (f g : A -> form):
   (∀ x, f x ⟺ g x) ->
   ∀ l, Forall (λ x, f x ⟺ g x) l.
 Proof.
-  move => H. elim => [|x l IH] //=. econs.
+  move => H. elim => [|x l IH] //=.
 Qed.
 
 Lemma eqderiv_map {A} (f g : A -> form) :
   (∀ x, f x ⟺ g x) ->
   ∀ l, Forall2 eqderiv (f <$> l) (g <$> l).
 Proof.
-  move => H. elim => [|x l IH] //=. econs.
+  move => H. elim => [|x l IH] //=.
 Qed.
 
 (** * Some useful tautologies *)
@@ -720,13 +778,13 @@ Qed.
 Lemma And_singl A :
   ⋀ [A] ⟺ A.
 Proof.
-  rewrite /= true_and. reflexivity.
+  by rewrite /= true_and.
 Qed.
 
 Lemma Or_singl A :
   ⋁ [A] ⟺ A.
 Proof.
-  rewrite /= false_or. reflexivity.
+  by rewrite /= false_or.
 Qed.
 
 Lemma currying A B C :
@@ -784,14 +842,13 @@ Lemma wpol_And A : ∀ Γ,
   A ∧ ⋀ Γ ⟺ A ∧ ⋀ ((λ B, A ∧ B) <$> Γ).
 Proof.
   elim => [|C Γ [IHl IHr]] //=.
-  * eqd.
-  * rewrite [A ∧ _]and_assoc [A ∧ _]and_comm -[_ ∧ ⋀ Γ]and_assoc.
-    rewrite [A ∧ (C ∧ _) ∧ _]and_assoc [A ∧ C ∧ _]and_assoc -[((A ∧ C) ∧ _) ∧ _]and_assoc.
-    split.
-    - pintroR. isrch.
-      pintroL 0. by pweak 0.
-    - pintroR. pintroL 0. pintroL 0. pweak 0. passum.
-      pintroL 0. by pweak 0.
+  rewrite [A ∧ _]and_assoc [A ∧ _]and_comm -[_ ∧ ⋀ Γ]and_assoc.
+  rewrite [A ∧ (C ∧ _) ∧ _]and_assoc [A ∧ C ∧ _]and_assoc -[((A ∧ C) ∧ _) ∧ _]and_assoc.
+  split.
+  - pintroR. isrch.
+    pintroL 0. by pweak 0.
+  - pintroR. pintroL 0. pintroL 0. pweak 0. passum.
+    pintroL 0. by pweak 0.
 Qed.
 
 Lemma wpol_Or {T} A (f : T -> form) : ∀ Γ,
@@ -809,6 +866,28 @@ Proof.
     pweak 1. pweak 1.
     apply (S_cut (A ∧ ⋁ (f <$> Γ)) []). assumption.
     pweak 1. isrch.
+Qed.
+
+Lemma wpol_exists A B :
+  A ∧ #∃ B ⟺ #∃ ((fshift 1 0 A) ∧ B).
+Proof.
+  eqd.
+  * pexR (TVar 0). simpl.
+    repeat rewrite fsubst_fshift funshift_fshift. isrch.
+  * pexR (TVar 0). simpl.
+    repeat rewrite fsubst_fshift funshift_fshift. isrch.
+Qed. 
+
+Lemma wpol_nexists n : ∀ A B,
+  A ∧ n#∃ B ⟺ n#∃ ((fshift n 0 A) ∧ B).
+Proof.
+  elim: n => [A B |n IH A B] //=.
+  by rewrite fshift_zero.
+  rewrite wpol_exists.
+  apply proper_exists.
+  rewrite IH.
+  rewrite [_ (S n) _ _]fshift_succ.
+  by rewrite fshift_comm.
 Qed.
 
 Lemma spol_r A B :
@@ -839,8 +918,7 @@ Proof.
     rewrite fmap_cons (cons_app (f x)) Or_app Or_singl.
     rewrite currying or_imp_distr [A ⊃ _ ∧ (_ ⊃ _)]imp_and_distr.
     rewrite -[A ⊃ (⋁ _) ⊃ B]currying -IH.
-    rewrite -imp_and_distr.
-    reflexivity.
+    by rewrite -imp_and_distr.
 Qed.
 
 Lemma imp_intro_r_inv A Γ C :

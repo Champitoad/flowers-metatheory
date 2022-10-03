@@ -4,169 +4,92 @@ Require Import ssreflect.
 Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
 Close Scope string_scope.
 
-Declare Scope flower_scope.
-Delimit Scope flower_scope with flower.
-Bind Scope flower_scope with flower.
-
-Declare Scope garden_scope.
-Delimit Scope garden_scope with garden.
-Bind Scope garden_scope with garden.
-
-Open Scope flower_scope.
-Open Scope garden_scope.
-
 (** * Soundness *)
 
 Section Soundness.
 
 Import Flowers.Syntax.
 
+Reserved Notation "⌊ ϕ ⌋" (format "⌊ ϕ ⌋").
+Reserved Notation "[⌊ ϕ ⌋]" (format "[⌊ ϕ ⌋]").
+
 Fixpoint flower_to_form (ϕ : flower) : form :=
   match ϕ with
   | Atom p args => FAtom p args
-  | n ⋅ Φ ⊢ δ => n#∀ (⋀ (flower_to_form <$> Φ) ⊃ ⋁ (garden_to_form <$> δ))
+  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ [⌊Φ⌋] ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ [⌊Ψ⌋]) <$> Δ))
   end
-with garden_to_form (γ : garden) : form :=
-  let '(n ⋅ Φ) := γ in
-  n#∃ (⋀ (flower_to_form <$> Φ)).
+where "⌊ ϕ ⌋" := (flower_to_form ϕ)
+  and "[⌊ Φ ⌋]" := (map flower_to_form Φ).
 
-Definition fmf := @fmap list list_fmap flower form.
-Definition fmg := @fmap list list_fmap garden form.
+Definition interp (Φ : bouquet) :=
+  ⋀ [⌊Φ⌋].
 
-Definition flowers_to_form := fmf garden_to_form.
-Definition gardens_to_form := fmg garden_to_form.
+Notation "⟦ Φ ⟧" := (interp Φ) (format "⟦ Φ ⟧").
 
-Notation "⌊ ϕ ⌋" := (flower_to_form ϕ) (format "⌊ ϕ ⌋") : flower_scope.
-Notation "⌊ γ ⌋" := (garden_to_form γ) (format "⌊ γ ⌋") : garden_scope.
+(* Definition ctx_to_fctx (X : ctx) : fctx :=
+  match X with
+  | Hole => CHole
+  | Planter Φ X Φ' =>  *)
 
-Lemma flower_garden ϕ :
-  ⌊ϕ⌋%flower ⟺ ⌊ϕ⌋%garden.
+Lemma wpol (ϕ : flower) X :
+  ⟦ϕ⟧ ∧ ⟦X ⋖ shift (bv X) 0 ϕ⟧ ⟺
+  ⟦ϕ⟧ ∧ ⟦X ⋖ []⟧.
 Proof.
-  simpl. rewrite true_and. reflexivity.
-Qed.
-
-Lemma flower_flowers Φ :
-  Forall2 eqderiv (flower_to_form <$> Φ) (flowers_to_form Φ).
-Proof.
-  apply Forall_equiv_map. apply eqderiv_Forall.
-  move => F. rewrite flower_garden. reflexivity.
-Qed.
-
-Lemma garden_gardens Δ :
-  Forall2 eqderiv (garden_to_form <$> Δ) (gardens_to_form Δ).
-Proof.
-  apply Forall_equiv_map. apply eqderiv_Forall.
-  move => δ. reflexivity.
-Qed.
-
-Lemma gardens_flowers : ∀ (Δ : list garden),
-  Forall2 eqderiv
-  (gardens_to_form Δ)
-  (fmg (λ '(n ⋅ Φ), n#∃ (⋀ (flowers_to_form Φ))) Δ).
-Proof.
-  elim => [|γ Δ IH] //=.
-  econs. case γ => [n Ψ] //=.
-  rewrite flower_flowers.
-  reflexivity.
-Qed.
-
-Lemma garden_flowers n Φ : 
-  ⌊n ⋅ Φ⌋ ⟺ n#∃ ⋀ (flowers_to_form Φ).
-Proof.
-  rewrite -flower_flowers.
-  case Φ => *; reflexivity.
-Qed.
-
-Lemma interp_flower n Φ Δ :
-  ⌊n ⋅ Φ ⊢ Δ⌋ ⟺
-  (n#∀ (⋀ (flowers_to_form Φ) ⊃ ⋁ (gardens_to_form Δ))).
-Proof.
-  simpl. rewrite flower_flowers garden_gardens.
-  rewrite true_and. reflexivity.
-Qed.
-
-Lemma interp_flower_flowers n Φ Δ :
-  ⌊n ⋅ Φ ⊢ Δ⌋ ⟺
-  (n#∀ (⋀ (flowers_to_form Φ) ⊃ ⋁ (fmg (λ '(m ⋅ Ψ), m#∃ ⋀ (flowers_to_form Ψ)) Δ))).
-Proof.
-  rewrite interp_flower gardens_flowers. reflexivity.
-Qed.
-
-Lemma interp_cons ϕ Φ :
-  ⌊0 ⋅ ϕ :: Φ⌋ ⟺ ⌊ϕ⌋ ∧ ⌊0 ⋅ Φ⌋.
-Proof.
-  rewrite /=; eqd.
-Qed.
-
-Lemma ffill_gfill (F : fctx) (Ψ : list flower) :
-  0 ⋅ F ⋖f Ψ = F ⋖ Ψ.
-Proof.
-  rewrite /=. by list_simplifier.
-Qed.
-
-Lemma assumed_Planter {ϕ n Φ F Φ'} :
-  ϕ ∈ Planter n Φ F Φ' ->
-  In ϕ Φ \/ ϕ ∈ F \/ In ϕ Φ'.
+  induction X.
 Admitted.
 
-Open Scope list_scope.
-
-Lemma In_app {A} {x : A} {l : list A} :
-  In x l -> exists ll lr, l = ll ++ [x] ++ lr.
+Lemma fshift_shift n c (ϕ : flower) :
+  fshift n c ⟦ϕ⟧ = ⟦shift n c ϕ⟧.
+Proof.
+  elim/flower_induction: ϕ.
 Admitted.
 
-Lemma pollination G : ∀ ϕ,
-  ϕ ∈ G ->
-  ⌊G ⋖ [fshift (gbv G) 0 ϕ]⌋ ⟺
-  ⌊G ⋖ []⌋.
+Lemma pollination (X : ctx) : ∀ (ϕ : flower) (n : nat),
+  ϕ ≺ n in X ->
+  ⟦X ⋖ [shift n 0 ϕ]⟧ ⟺
+  ⟦X ⋖ []⟧.
 Proof.
-  elim/gctx_induction: G => [|F IH n Φ Φ' ϕ H] //=.
-  list_simplifier.
-  apply proper_nexists; auto.
-  repeat rewrite And_app.
-
-  elim (assumed_Planter H) => [HΦ |[HF |HΦ']].
-  * elim (In_app HΦ) => [Φl [Φr Hsplit]].
-    rewrite Hsplit.
-    repeat rewrite fmap_app And_app.
-    repeat rewrite map_singl And_singl.
-    repeat rewrite and_assoc; apply proper_and; try reflexivity.
-    repeat rewrite -and_assoc; apply proper_and; try reflexivity.
-    rewrite and_assoc [⌊ϕ⌋%flower ∧ _]and_comm -and_assoc.
-    rewrite [⌊ϕ⌋%flower ∧ _ ∧ _]and_assoc
-            [⌊ϕ⌋%flower ∧ ⋀ (flower_to_form <$> Φr)]and_comm
-            -and_assoc.
-    apply proper_and; try reflexivity.
-    rewrite wpol_And -list_fmap_compose.
-    rewrite /Pflower in IH.
-    destruct F; simpl.
-Restart.
-  elim/gctx_induction: G => [|F IH n Φ Φ' ϕ H] //=.
-  list_simplifier.
-  apply proper_nexists; auto.
-  repeat rewrite And_app.
-
-  rewrite /Pflower in IH.
-  induction F using fctx_induction.
-  * simpl. repeat rewrite true_and.
-Admitted.
-
-Lemma self_pollination (γ : gctx) (γ δ : garden) (Δ : list garden) :
-  ⌊γ ∪ δ ⊢ γ ! ∅ :: Δ⌋ ⟺ ⌊γ ∪ δ ⊢ γ ! γ :: Δ⌋.
-Proof.
-  rewrite interp_flower interp_juxt and_comm currying.
-  rewrite /gardens_to_form/fmg fmap_cons.
-  rewrite cons_app Or_app Or_singl.
-  rewrite (spol_r ⌊γ⌋) and_or_distr.
-
-  rewrite -interp_juxt -(wind_pollination γ γ) interp_juxt.
-
-  rewrite -and_or_distr -spol_r.
-  rewrite -[⌊_ ! _⌋]Or_singl -Or_app -cons_app.
-  rewrite -fmap_cons -/fmg -/gardens_to_form.
-  rewrite -currying -and_comm -interp_juxt -interp_flower.
-
-  by reflexivity.
+  intros ?? H. inv H; list_simplifier.
+  * rewrite /interp map_singl map_singl /=.
+    repeat rewrite fmap_app fmap_cons.
+    repeat rewrite true_and.
+    apply proper_nforall; auto.
+    rewrite cons_app. repeat rewrite map_app And_app.
+    repeat rewrite [⋀ [⌊[ϕ]⌋] ∧ _]and_comm.
+    repeat rewrite [⋀ [⌊Φ⌋] ∧ _]and_assoc.
+    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋] ⊃ _]currying.
+    apply proper_imp; auto.
+    repeat rewrite [m#∃ _ :: (_ <$> _)]cons_app.
+    repeat rewrite Or_app.
+    apply proper_concl.
+    repeat rewrite [⋁ [_] ∨ _]or_comm.
+    apply proper_concl.
+    repeat rewrite Or_singl.
+    repeat rewrite [_ ⊃ m#∃ _]spol_r.
+    apply proper_imp; auto.
+    repeat rewrite wpol_nexists.
+    apply proper_nexists; auto.
+    rewrite fshift_shift.
+    rewrite shift_add shift_comm.
+    by rewrite wpol.
+  * rewrite /interp [ϕ :: Φ']cons_app.
+    repeat rewrite map_app And_app.
+    apply proper_and; auto.
+    rewrite [⋀ [⌊Φ⌋] ∧ _]and_comm.
+    rewrite -[_ ∧ ⋀ [⌊Φ⌋]]and_assoc.
+    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋] ∧ _]and_assoc.
+    apply proper_and; auto.
+    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋]]and_comm.
+    by rewrite wpol.
+  * rewrite /interp. repeat rewrite [ϕ :: _ ++ _]cons_app.
+    repeat rewrite map_app And_app.
+    apply proper_and; auto.
+    repeat rewrite and_assoc.
+    apply proper_and; auto.
+    rewrite [_ ∧ ⋀ [⌊Φ'⌋]]and_comm.
+    rewrite -and_assoc -and_assoc.
+    apply proper_and; auto.
+    by rewrite wpol.
 Qed.
 
 Lemma reproduction δs γ Δ :
