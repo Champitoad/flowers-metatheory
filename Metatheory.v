@@ -55,8 +55,25 @@ Proof.
     pose proof (IH := IHX (shift n 0 ϕ)).
     rewrite -fshift_shift shift_comm -shift_add /interp/= true_and in IH.
     by rewrite IH.
-  * admit.
-Admitted.
+  * case γ => [k Φ].
+    repeat rewrite wpol_nforall; apply proper_nforall; auto.
+    repeat rewrite [_ ∧ (_ ⊃ ⋁ _)]wpol_imp_r ; apply proper_and; auto.
+    apply proper_imp; auto.
+    repeat rewrite [_ :: Δ']cons_app.
+    repeat rewrite fmap_app Or_app.
+    do 4 rewrite and_or_distr.
+    apply proper_or; auto.
+    apply proper_or; auto.
+    repeat rewrite Or_singl.
+    repeat rewrite wpol_nexists; apply proper_nexists; auto.
+    pose proof (IH := IHX (shift n 0 (shift k 0 ϕ))).
+    rewrite -fshift_shift -fshift_shift in IH.
+    repeat rewrite -shift_add in IH.
+    repeat rewrite /interp/= true_and in IH.
+    assert (Hcomm : bv X + n + k = k + n + bv X). { lia. }
+    rewrite Hcomm in IH.
+    by rewrite IH.
+Qed.
 
 Lemma pollination (X : ctx) : ∀ (ϕ : flower) (n : nat),
   ϕ ≺ n in X ->
