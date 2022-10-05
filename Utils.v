@@ -159,6 +159,14 @@ Proof.
   elim => [|x l IH H] //=. rewrite H. f_equal. by apply IH.
 Qed.
 
+Lemma impl_Forall {A} (P Q : A -> Prop) : ∀ (l : list A),
+  (∀ x, P x -> Q x) ->
+  Forall P l -> Forall Q l.
+Proof.
+  elim => [|x l IH H] //=.
+  move => Hl; inv Hl; firstorder.
+Qed.
+
 Lemma equiv_Forall {A} (P Q : A -> Prop) : ∀ (l : list A),
   (∀ x, P x <-> Q x) ->
   Forall P l <-> Forall Q l.
@@ -212,6 +220,18 @@ Lemma Forall_eq_map {A B} (l : list A) (f g : A -> B) :
 Proof.
   rewrite -Forall2_eq_eq.
   apply Forall_equiv_map.
+Qed.
+
+Lemma Forall_forall {A B} (l : list A) (P : A -> B -> Prop) :
+  Forall (λ x, ∀ y, P x y) l <->
+  ∀ y, Forall (λ x, P x y) l.
+Proof.
+  elim: l => [|a l IHl] //=.
+  split; intro H.
+  * intro y. inv H. econs; auto. by apply IHl.
+  * econs.
+    - intro y. specialize (H y). inv H.
+    - apply IHl. intro y. specialize (H y). inv H.
 Qed.
 
 Lemma map_id_ext {A} (l : list A) :

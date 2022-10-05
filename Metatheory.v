@@ -11,31 +11,55 @@ Section Soundness.
 Import Flowers.Syntax.
 
 Reserved Notation "⌊ ϕ ⌋" (format "⌊ ϕ ⌋").
-Reserved Notation "[⌊ ϕ ⌋]" (format "[⌊ ϕ ⌋]").
+Reserved Notation "⌊⌊ ϕ ⌋⌋" (format "⌊⌊ ϕ ⌋⌋").
 
 Fixpoint flower_to_form (ϕ : flower) : form :=
   match ϕ with
   | Atom p args => FAtom p args
-  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ [⌊Φ⌋] ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ [⌊Ψ⌋]) <$> Δ))
+  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ ⌊⌊Φ⌋⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ))
   end
 where "⌊ ϕ ⌋" := (flower_to_form ϕ)
-  and "[⌊ Φ ⌋]" := (map flower_to_form Φ).
+  and "⌊⌊ Φ ⌋⌋" := (flower_to_form <$> Φ).
 
 Definition interp (Φ : bouquet) :=
-  ⋀ [⌊Φ⌋].
+  ⋀ ⌊⌊Φ⌋⌋.
 
 Notation "⟦ Φ ⟧" := (interp Φ) (format "⟦ Φ ⟧").
 
-(* Definition ctx_to_fctx (X : ctx) : fctx :=
-  match X with
-  | Hole => CHole
-  | Planter Φ X Φ' =>  *)
-
-Lemma fshift_shift n c (ϕ : flower) :
-  fshift n c ⟦ϕ⟧ = ⟦shift n c ϕ⟧.
+Lemma interp_flower (ϕ : flower) :
+  ⟦ϕ⟧ ⟺ ⌊ϕ⌋.
 Proof.
-  elim/flower_induction: ϕ.
-Admitted.
+  rewrite /interp/=. by rewrite true_and.
+Qed.
+
+Lemma fshift_shift (ϕ : flower) : ∀ n c,
+  fshift n c ⌊ϕ⌋ ⟺ ⌊shift n c ϕ⌋.
+Proof.
+  elim/flower_induction: ϕ => [p args n c |γ Δ IHγ IHΔ n c]//=.
+  move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
+  rewrite /interp/=.
+  rewrite fshift_nforall/= fshift_And fshift_Or.
+  rewrite Forall_forall in IHγ; specialize (IHγ n).
+  rewrite Forall_forall in IHγ; specialize (IHγ (c + m)).
+  rewrite Forall_equiv_map in IHγ.
+  rewrite IHγ.
+  rewrite -list_fmap_compose list_fmap_compose.
+  set f := λ δ : garden, fshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (shift n (c + m + k)) <$> Ψ.
+  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  (* { induction Δ; inv IHΔ; econs. *)
+  { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ IHΔ ?]//=; econs.
+    rewrite /f/g/h//=.
+    rewrite fshift_nexists fshift_And.
+    apply proper_nexists; auto; apply proper_And; auto.
+    rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
+    apply Forall_equiv_map. rewrite /=.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ n).
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
+    done. }
+  by rewrite H list_fmap_compose.
+Qed.
 
 Lemma wpol X : ∀ (ϕ : flower),
   ⟦ϕ⟧ ∧ ⟦X ⋖ shift (bv X) 0 ϕ⟧ ⟺
@@ -45,7 +69,7 @@ Proof.
   rewrite /interp//=;
   repeat rewrite true_and.
   * rewrite shift_zero. eqd.
-  * repeat rewrite map_app And_app.
+  * repeat rewrite fmap_app And_app.
     rewrite and_assoc [(⌊ϕ⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⌊ϕ⌋) ∧ _]and_assoc.
     pose proof (IH := IHX ϕ); rewrite /interp/= true_and in IH.
     rewrite IH; eqd.
@@ -53,7 +77,8 @@ Proof.
     repeat rewrite [_ ∧ (⋀ _ ⊃ _)]wpol_imp_l; apply proper_and; auto.
     apply proper_imp; auto.
     pose proof (IH := IHX (shift n 0 ϕ)).
-    rewrite -fshift_shift shift_comm -shift_add /interp/= true_and in IH.
+    repeat rewrite interp_flower in IH.
+    rewrite -fshift_shift shift_comm -shift_add /interp/= in IH.
     by rewrite IH.
   * case γ => [k Φ].
     repeat rewrite wpol_nforall; apply proper_nforall; auto.
@@ -67,10 +92,12 @@ Proof.
     repeat rewrite Or_singl.
     repeat rewrite wpol_nexists; apply proper_nexists; auto.
     pose proof (IH := IHX (shift n 0 (shift k 0 ϕ))).
-    rewrite -fshift_shift -fshift_shift in IH.
+    repeat rewrite interp_flower in IH.
     repeat rewrite -shift_add in IH.
+    rewrite -fshift_shift in IH.
+    repeat rewrite fshift_add in IH.
     repeat rewrite /interp/= true_and in IH.
-    assert (Hcomm : bv X + n + k = k + n + bv X). { lia. }
+    assert (Hcomm : bv X + (n + k) = k + n + bv X). { lia. }
     rewrite Hcomm in IH.
     by rewrite IH.
 Qed.
@@ -81,14 +108,14 @@ Lemma pollination (X : ctx) : ∀ (ϕ : flower) (n : nat),
   ⟦X ⋖ []⟧.
 Proof.
   intros ?? H. inv H; list_simplifier.
-  * rewrite /interp map_singl map_singl /=.
+  * rewrite /interp/=.
     repeat rewrite fmap_app fmap_cons.
     repeat rewrite true_and.
     apply proper_nforall; auto.
-    rewrite cons_app. repeat rewrite map_app And_app.
-    repeat rewrite [⋀ [⌊[ϕ]⌋] ∧ _]and_comm.
-    repeat rewrite [⋀ [⌊Φ⌋] ∧ _]and_assoc.
-    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋] ⊃ _]currying.
+    rewrite cons_app. repeat rewrite And_app. rewrite And_singl.
+    rewrite [⌊ϕ⌋ ∧ _]and_comm.
+    repeat rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_assoc.
+    repeat rewrite [_ ∧ ⌊ϕ⌋ ⊃ _]currying.
     apply proper_imp; auto.
     repeat rewrite [m#∃ _ :: (_ <$> _)]cons_app.
     repeat rewrite Or_app.
@@ -102,25 +129,25 @@ Proof.
     apply proper_nexists; auto.
     rewrite fshift_shift.
     rewrite shift_add shift_comm.
-    by rewrite wpol.
+    by rewrite -interp_flower wpol.
   * rewrite /interp [ϕ :: Φ']cons_app.
-    repeat rewrite map_app And_app.
+    repeat rewrite fmap_app And_app. rewrite And_singl.
     apply proper_and; auto.
-    rewrite [⋀ [⌊Φ⌋] ∧ _]and_comm.
-    rewrite -[_ ∧ ⋀ [⌊Φ⌋]]and_assoc.
-    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋] ∧ _]and_assoc.
+    rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_comm.
+    rewrite -[_ ∧ ⋀ ⌊⌊Φ⌋⌋]and_assoc.
+    repeat rewrite [_ ∧ ⌊ϕ⌋ ∧ _]and_assoc.
     apply proper_and; auto.
-    repeat rewrite [_ ∧ ⋀ [⌊[ϕ]⌋]]and_comm.
-    by rewrite wpol.
+    repeat rewrite [_ ∧ ⌊ϕ⌋]and_comm.
+    by rewrite -interp_flower wpol.
   * rewrite /interp. repeat rewrite [ϕ :: _ ++ _]cons_app.
-    repeat rewrite map_app And_app.
+    repeat rewrite fmap_app And_app. rewrite And_singl.
     apply proper_and; auto.
     repeat rewrite and_assoc.
     apply proper_and; auto.
-    rewrite [_ ∧ ⋀ [⌊Φ'⌋]]and_comm.
+    rewrite [_ ∧ ⋀ ⌊⌊Φ'⌋⌋]and_comm.
     rewrite -and_assoc -and_assoc.
     apply proper_and; auto.
-    by rewrite wpol.
+    by rewrite -interp_flower wpol.
 Qed.
 
 Lemma reproduction δs γ Δ :

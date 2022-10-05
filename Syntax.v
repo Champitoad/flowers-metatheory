@@ -99,13 +99,45 @@ Fixpoint subst (n : nat) (t : term) (ϕ : flower) : flower :=
 Definition gsubst n t '(m ⋅ Φ) : garden :=
   m ⋅ subst (n + m) (tshift m 0 t) <$> Φ.
 
-Lemma shift_zero c : ∀ ϕ,
+Lemma shift_zero : ∀ ϕ c,
   shift 0 c ϕ = ϕ.
-Admitted.
+Proof.
+  elim/flower_induction => [p args |[m Φ] Δ IHγ IHΔ] c /=.
 
-Lemma shift_add c n m : ∀ ϕ,
+  * pose proof (H := eq_map (tshift 0 c) id args (tshift_zero c)).
+    by rewrite H list_fmap_id.
+
+  * rewrite Forall_forall in IHγ; specialize (IHγ (c + m)).
+    apply Forall_eq_map in IHγ; rewrite IHγ map_id_ext.
+
+    elim: {Δ} IHΔ => [|[n Ψ] Δ IHΨ IHΔ IH] //=; inv IH.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + n)).
+    apply Forall_eq_map in IHΨ; rewrite IHΨ map_id_ext.
+    by repeat f_equal.
+Qed.
+
+Lemma shift_add : ∀ ϕ c n m,
   shift (n + m) c ϕ = shift n c (shift m c ϕ).
-Admitted.
+Proof.
+  elim/flower_induction => [p args |[k Φ] Δ IHγ IHΔ] c n m /=.
+
+  * pose proof (H := eq_map (tshift (n + m) c) _ args (tshift_add c n m)).
+    by rewrite H list_fmap_compose.
+
+  * rewrite Forall_forall in IHγ; specialize (IHγ (c + k));
+    rewrite Forall_forall in IHγ; specialize (IHγ n);
+    rewrite Forall_forall in IHγ; specialize (IHγ m).
+    apply Forall_eq_map in IHγ; rewrite IHγ list_fmap_compose.
+
+    elim: {Δ} IHΔ => [|[l Ψ] Δ IHΨ IHΔ IH]//=; inv IH.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + k + l));
+    rewrite Forall_forall in IHΨ; specialize (IHΨ n);
+    rewrite Forall_forall in IHΨ; specialize (IHΨ m).
+    apply Forall_eq_map in IHΨ; rewrite IHΨ.
+    f_equal. f_equal.
+    by rewrite list_fmap_compose.
+    done.
+Qed.
 
 Lemma shift_comm c n m ϕ :
   shift n c (shift m c ϕ) = shift m c (shift n c ϕ).
@@ -128,7 +160,7 @@ Lemma juxt_empty γ :
   ∅ ∪ γ = γ.
 Proof.
   case γ => n Φ //=.
-  pose proof (eq_map (shift 0 n) id Φ (shift_zero n)).
+  pose proof (eq_map (shift 0 n) id Φ (λ ϕ, shift_zero ϕ n)).
   by rewrite H list_fmap_id.
 Qed.
 

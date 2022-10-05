@@ -87,6 +87,8 @@ Notation "⋁ As" := (Or As) (at level 5).
 Notation "n #∀ A" := (nforall n A) (format "n #∀  A", at level 6).
 Notation "n #∃ A" := (nexists n A) (format "n #∃  A", at level 6).
 
+(** * Shifting and substitution *)
+
 Fixpoint fshift (n : nat) (c : nat) (A : form) : form :=
   match A with
   | FAtom p args => FAtom p (tshift n c <$> args)
@@ -120,7 +122,49 @@ Fixpoint fsubst (n : nat) (u : term) (A : form) : form :=
   | FExists A => FExists (fsubst (n+1) (tshift 1 0 u) A)
   end.
 
+(** ** Shifting commutes with n-ary connectives *)
 
+Lemma fshift_And {T} (f : T -> form) : ∀ Γ n c,
+  fshift n c ⋀ (f <$> Γ) = ⋀ ((λ A, fshift n c (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
+Lemma fshift_Or {T} (f : T -> form) : ∀ Γ n c,
+  fshift n c ⋁ (f <$> Γ) = ⋁ ((λ A, fshift n c (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
+Lemma fshift_nforall : ∀ m n c A,
+  fshift n c m#∀ A = m#∀ (fshift n (c + m) A).
+Proof.
+  elim => [n c A |m IH n c A]//=.
+  by rewrite Nat.add_0_r.
+  f_equal.
+  specialize (IH n (c + 1) A).
+  assert (H : c + 1 + m = c + S m). { lia. }
+  rewrite H in IH.
+  by rewrite IH.
+Qed.
+
+Lemma fshift_nexists : ∀ m n c A,
+  fshift n c m#∃ A = m#∃ (fshift n (c + m) A).
+Proof.
+  elim => [n c A |m IH n c A]//=.
+  by rewrite Nat.add_0_r.
+  f_equal.
+  specialize (IH n (c + 1) A).
+  assert (H : c + 1 + m = c + S m). { lia. }
+  rewrite H in IH.
+  by rewrite IH.
+Qed.
+
+(** ** Shifting and arithmetic *)
 
 Lemma fshift_zero : ∀ A c,
   fshift 0 c A = A.
@@ -166,6 +210,8 @@ Lemma fshift_comm A c n m :
 Proof.
   by rewrite -fshift_add Nat.add_comm fshift_add.
 Qed.
+
+(** ** Interaction of shifting and substitution *)
 
 Lemma fsubst_fshift A : ∀ c m,
   fsubst c (TVar (c + m)) (fshift m (S c) A) = fshift m c A.
@@ -548,6 +594,11 @@ Qed.
 
 #[global] Hint Extern 1 (_ ⟺ _) => reflexivity : core.
 
+#[global] Instance : subrelation eq eqderiv.
+Proof.
+  red. intros A B H. by rewrite H.
+Qed.
+
 Add Morphism FAnd with signature
   eqderiv ==> eqderiv ==> eqderiv
   as proper_and.
@@ -607,6 +658,15 @@ Proof.
     - pweak 0. by apply IHA.
 Qed.
 
+Add Morphism And with signature
+  Forall2 eq ==> eq
+  as proper_And_eq.
+Proof.
+  move => A B H.
+  apply Forall2_eq_eq in H.
+  by rewrite H.
+Qed.
+
 Add Morphism Or with signature
   Forall2 eqderiv ==> eqderiv
   as proper_Or.
@@ -618,6 +678,15 @@ Proof.
     - pright. by apply IHA.
     - pleft. apply H.
     - pright. by apply IHA.
+Qed.
+
+Add Morphism Or with signature
+  Forall2 eq ==> eq
+  as proper_Or_eq.
+Proof.
+  move => A B H.
+  apply Forall2_eq_eq in H.
+  by rewrite H.
 Qed.
 
 Add Morphism nforall with signature
