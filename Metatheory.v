@@ -1,8 +1,7 @@
-Require Import String stdpp.list stdpp.relations.
+Require Import stdpp.list stdpp.relations.
 Require Import ssreflect.
 
 Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
-Close Scope string_scope.
 
 (** * Soundness *)
 
@@ -48,8 +47,7 @@ Proof.
   set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (shift n (c + m + k)) <$> Ψ.
   assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
-  (* { induction Δ; inv IHΔ; econs. *)
-  { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ IHΔ ?]//=; econs.
+  { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
     rewrite /f/g/h//=.
     rewrite fshift_nexists fshift_And.
     apply proper_nexists; auto; apply proper_And; auto.
@@ -150,23 +148,39 @@ Proof.
     by rewrite -interp_flower wpol.
 Qed.
 
-Lemma reproduction δs γ Δ :
-  ⌊γ ⊢ [⋅(λ δ, δ ⊢ Δ) <$> δs]⌋ ⟺ ⌊(⊢ δs) ∪ γ ⊢ Δ⌋.
+Lemma reproduction (Δ : list garden) n (Φ Φ' : bouquet) (Δ' : list garden) :
+  ⟦n ⋅ Φ ++ [⊢ Δ] ++ Φ' ⊢ Δ'⟧ ⟺
+  ⟦n ⋅ Φ ++ Φ' ⊢ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⊢ gshift m 0 <$> Δ') <$> Δ]⟧.
 Proof.
-  rewrite interp_flower_flowers -garden_flowers.
-  rewrite [fmg _ _]/= Or_singl.
-  rewrite /flowers_to_form /fmf -list_fmap_compose /compose.
-  rewrite (eqderiv_map (λ δ, ⌊δ ⊢ Δ⌋) (λ δ, ⌊δ⌋ ⊃ ⋁ (gardens_to_form Δ))).
-  { intros. simpl. rewrite true_and. reflexivity. }
+  rewrite /interp/=.
+  repeat rewrite true_and; repeat rewrite false_or.
+  rewrite -list_fmap_compose /compose.
+  under [_ <$> Δ]eqderiv_map => δ do simpl.
 
-  rewrite interp_flower_flowers -garden_flowers.
-  rewrite interp_juxt interp_flower_flowers -garden_flowers.
-  rewrite [⌊∅⌋]/= true_imp_l.
-  pose proof (H := garden_flowers). symmetry in H.
-  repeat rewrite /fmg (eqderiv_map (λ δ : garden, ⋀ (flowers_to_form δ)) garden_to_form); auto.
+  rewrite cons_app; repeat rewrite fmap_app And_app.
+  rewrite /=. rewrite true_imp_l true_and.
+  rewrite [_ ∧ ⋀ _]and_comm and_assoc.
+  rewrite -or_intro_l_nary.
 
-  rewrite and_comm.
-  apply or_intro_l_nary.
+  apply proper_nforall; auto.
+  apply proper_imp; auto.
+  apply proper_And; auto.
+  apply Forall_equiv_map.
+  apply equiv_Forall. move => [k Θ] /=.
+  assert (H :
+    fshift k 0 ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ') ⟺
+    ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> (gshift k 0 <$> Δ'))).
+  { rewrite fshift_Or.
+    apply proper_Or.
+    rewrite -list_fmap_compose.
+    apply Forall_equiv_map; apply equiv_Forall; move => [m Ψ] /=.
+    rewrite fshift_nexists fshift_And /=.
+    apply proper_nexists; auto; apply proper_And; auto.
+    rewrite -list_fmap_compose.
+    apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
+    by rewrite -fshift_shift. }
+  rewrite -H.
+  apply nexists_intro_l.
 Qed.
 
 Lemma permutation_garden Φ Φ' :

@@ -211,6 +211,38 @@ Proof.
     by rewrite IH.
 Qed.
 
+Lemma tsubst_tshift_vacuous2 : ∀ t m c,
+  tsubst c (TVar (c + m)) (tshift m (S c) t) = tshift m c t.
+Proof.
+  elim/term_induction => [n |f args IH] m c /=.
+  * destruct (n <? S c) eqn:Hltb.
+    - destruct (c =? n) eqn:Heqb.
+      + apply Nat.eqb_eq in Heqb.
+        assert (H : n <? c = false).
+        { apply Nat.ltb_nlt. lia. }
+        by rewrite H Heqb.
+      + assert (H : n <? c = true).
+        { apply Nat.ltb_lt in Hltb.
+          apply Nat.ltb_lt.
+          apply Nat.eqb_neq in Heqb.
+          lia. }
+        by rewrite H.
+    - destruct (c =? n + m) eqn:Heqb.
+      + apply Nat.eqb_eq in Heqb.
+        rewrite Heqb in Hltb.
+        apply Nat.ltb_nlt in Hltb.
+        lia.
+      + assert (H : n <? c = false).
+        { apply Nat.ltb_nlt in Hltb.
+          apply Nat.ltb_nlt.
+          lia. }
+        by rewrite H.
+  * rewrite Forall_forall in IH; specialize (IH m).
+    rewrite Forall_forall in IH; specialize (IH c).
+    rewrite Forall_eq_map in IH. rewrite -IH.
+    by rewrite -list_fmap_compose.
+Qed.
+
 Lemma tunshift_tshift m c t :
   tunshift m c (tshift m c t) = t.
 Proof.

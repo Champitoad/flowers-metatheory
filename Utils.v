@@ -167,12 +167,11 @@ Proof.
   move => Hl; inv Hl; firstorder.
 Qed.
 
-Lemma equiv_Forall {A} (P Q : A -> Prop) : ∀ (l : list A),
-  (∀ x, P x <-> Q x) ->
-  Forall P l <-> Forall Q l.
+Lemma equiv_Forall {A B} {e : Equiv B} (f g : A -> B) : ∀ (l : list A),
+  (∀ x, e (f x) (g x)) ->
+  Forall (λ x, e (f x) (g x)) l.
 Proof.
   elim => [|x l IH H] //=.
-  split; move => Hl; inv Hl; firstorder.
 Qed.
 
 #[export] Instance Forall2_Equivalence {A} (e : relation A) {_ : Equivalence e} :
@@ -232,6 +231,14 @@ Proof.
   * econs.
     - intro y. specialize (H y). inv H.
     - apply IHl. intro y. specialize (H y). inv H.
+Qed.
+
+Lemma eq_fmap {A B} (f g : A -> B) : ∀ (l : list A),
+  (∀ x, f x = g x) ->
+  f <$> l = g <$> l.
+Proof.
+  elim => [|a l IHl] H //=. rewrite H.
+  specialize (IHl H). rewrite /fmap in IHl. by rewrite IHl.
 Qed.
 
 Lemma map_id_ext {A} (l : list A) :

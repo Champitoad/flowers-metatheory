@@ -229,7 +229,8 @@ Lemma fsubst_fshift_vacuous A : ∀ n u m c,
   n < m ->
   fsubst (n + c) u (fshift m c A) = fshift m c A.
 Proof.
-  induction A; intros; simpl; auto; try by rewrite (IHA1 n u m c H) (IHA2 n u m c H).
+  induction A; intros; simpl; auto;
+  try by rewrite (IHA1 n u m c H) (IHA2 n u m c H).
   * induction args; auto. list_simplifier.
     f_equal. f_equal; auto. by apply (tsubst_tshift_vacuous n u m c).
   * epose proof (IH := IHA n (tshift 1 0 u) m (c + 1) _).
@@ -238,6 +239,22 @@ Proof.
     f_equal. assert (Ha : n + c + 1 = n + (c + 1)). { lia. } by rewrite Ha.
   Unshelve.
   all: auto.
+Qed.
+
+Lemma fsubst_fshift_vacuous2 : ∀ A m c,
+  fsubst c (TVar (c + m)) (fshift m (S c) A) = fshift m c A.
+Proof.
+  induction A using form_induction; intros; simpl; auto;
+  try by rewrite (IHA1 m c) (IHA2 m c).
+  * rewrite -list_fmap_compose.
+    f_equal. apply eq_fmap. move => t /=.
+    by apply tsubst_tshift_vacuous2.
+  * f_equal. specialize (IHA m (c + 1)).
+    assert (H : c + 1 + m = c + m + 1). { lia. }
+    by rewrite -H IHA.
+  * f_equal. specialize (IHA m (c + 1)).
+    assert (H : c + 1 + m = c + m + 1). { lia. }
+    by rewrite -H IHA.
 Qed.
 
 Lemma funshift_fshift A : ∀ n c,
@@ -1045,6 +1062,55 @@ Proof.
   move => H. eqd.
   pimpL 1; isrch. L. R. apply imp_intro_r_inv. rewrite -H. isrch.
   pimpL 1; isrch. L. R. apply imp_intro_r_inv. rewrite H. isrch.
+Qed.
+
+Lemma forall_vacuous A :
+  A ⟺ #∀ (fshift 1 0 A).
+Proof.
+  eqd.
+  * passum.
+  * pfaL 0 (TVar 0).
+    rewrite (fsubst_fshift_vacuous A 0); first lia.
+    rewrite funshift_fshift; passum.
+Qed.
+
+Lemma exists_vacuous A :
+  A ⟺ #∃ (fshift 1 0 A).
+Proof.
+  eqd.
+  pexR (TVar 0).
+  rewrite (fsubst_fshift_vacuous A 0); first lia.
+  rewrite funshift_fshift; passum.
+Qed.
+
+Lemma exists_intro_l : ∀ A B,
+  #∃ A ⊃ B ⟺
+  #∀ (A ⊃ fshift 1 0 B).
+Proof.
+  intros; eqd.
+
+  pimpL 1. pexR (TVar 0).
+  rewrite fsubst_fshift_vacuous2 funshift_fshift /=. passum.
+
+  passum.
+
+  pfaL 1 (TVar 0).
+  rewrite fsubst_fshift_vacuous2 funshift_fshift /=.
+  pimpL 1; first passum.
+  rewrite fsubst_fshift_vacuous2 funshift_fshift /=.
+  passum.
+Qed.
+
+Lemma nexists_intro_l : ∀ n A B,
+  n#∃ A ⊃ B ⟺
+  n#∀ (A ⊃ fshift n 0 B).
+Proof.
+  elim => [|n IHn] A B //=.
+  by rewrite fshift_zero.
+  rewrite exists_intro_l.
+  apply proper_forall.
+  specialize (IHn A (fshift 1 0 B)).
+  by rewrite [_ (S n) _ _]fshift_succ fshift_comm.
 Qed.
 
 End Tautos.

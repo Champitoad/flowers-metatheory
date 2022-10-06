@@ -335,41 +335,41 @@ Inductive step : bouquet -> bouquet -> Prop :=
 (** *** Empty pistil *)
 
 | R_epis_pis m Ψ n Φ Φ' Δ :
-  [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ] ⇀
-  [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ]
+  n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ ⇀
+  n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ
 
 | R_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  [γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'] ⇀
-  [γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ']
+  γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ' ⇀
+  γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'
 
 | R_co_epis_pis m Ψ n Φ Φ' Δ :
-  [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ)] ⇀
-  [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ]
+  n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ) ⇀
+  n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ
 
 | R_co_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  [γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'] ⇀
-  [γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ']
+  γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ' ⇀
+  γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'
 
 (** *** Empty petal *)
 
 | R_pet	n γ Δ Δ' :
-  [γ ⊢ Δ ++ [n ⋅ []] ++ Δ'] ⇀
+  γ ⊢ Δ ++ [n ⋅ []] ++ Δ' ⇀
   []
 
 (** *** Reproduction *)
 
 | R_rep Δ n Φ Φ' Δ' :
-  [n ⋅ Φ ++ [⊢ Δ] ++ Φ' ⊢ Δ'] ⇀
-  [n ⋅ Φ ++ Φ' ⊢ [0 ⋅ (λ δ, δ ⊢ Δ') <$> Δ]]
+  n ⋅ Φ ++ [⊢ Δ] ++ Φ' ⊢ Δ' ⇀
+  n ⋅ Φ ++ Φ' ⊢ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⊢ gshift m 0 <$> Δ') <$> Δ]
 
 (** *** Instantiation *)
 
 | R_ipis i t n Φ Δ :
-  [n ⋅ Φ ⊢ Δ] ⇀
+  n ⋅ Φ ⊢ Δ ⇀
   [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift n 0 t) <$> Δ); n ⋅ Φ ⊢ Δ]
 
 | R_ipet i t n Φ γ Δ Δ' :
-  [γ ⊢ Δ ++ [n ⋅ Φ] ++ Δ] ⇀
+  γ ⊢ Δ ++ [n ⋅ Φ] ++ Δ ⇀
   [γ ⊢ Δ ++ [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ); n ⋅ Φ] ++ Δ']
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
