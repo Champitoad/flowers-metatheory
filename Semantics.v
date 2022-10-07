@@ -122,7 +122,7 @@ Fixpoint fsubst (n : nat) (u : term) (A : form) : form :=
   | FExists A => FExists (fsubst (n+1) (tshift 1 0 u) A)
   end.
 
-(** ** Shifting commutes with n-ary connectives *)
+(** ** Operations commute with n-ary connectives *)
 
 Lemma fshift_And {T} (f : T -> form) : ∀ Γ n c,
   fshift n c ⋀ (f <$> Γ) = ⋀ ((λ A, fshift n c (f A)) <$> Γ).
@@ -132,8 +132,40 @@ Proof.
   by rewrite IH.
 Qed.
 
+Lemma funshift_And {T} (f : T -> form) : ∀ Γ n t,
+  funshift n t ⋀ (f <$> Γ) = ⋀ ((λ A, funshift n t (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
+Lemma fsubst_And {T} (f : T -> form) : ∀ Γ n t,
+  fsubst n t ⋀ (f <$> Γ) = ⋀ ((λ A, fsubst n t (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
 Lemma fshift_Or {T} (f : T -> form) : ∀ Γ n c,
   fshift n c ⋁ (f <$> Γ) = ⋁ ((λ A, fshift n c (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
+Lemma funshift_Or {T} (f : T -> form) : ∀ Γ n c,
+  funshift n c ⋁ (f <$> Γ) = ⋁ ((λ A, funshift n c (f A)) <$> Γ).
+Proof.
+  elim => [n c |B Γ IH n c]//.
+  rewrite fmap_cons cons_app //=.
+  by rewrite IH.
+Qed.
+
+Lemma fsubst_Or {T} (f : T -> form) : ∀ Γ n c,
+  fsubst n c ⋁ (f <$> Γ) = ⋁ ((λ A, fsubst n c (f A)) <$> Γ).
 Proof.
   elim => [n c |B Γ IH n c]//.
   rewrite fmap_cons cons_app //=.
@@ -152,6 +184,31 @@ Proof.
   by rewrite IH.
 Qed.
 
+Lemma funshift_nforall : ∀ m n c A,
+  funshift n c m#∀ A = m#∀ (funshift n (c + m) A).
+Proof.
+  elim => [n c A |m IH n c A]//=.
+  by rewrite Nat.add_0_r.
+  f_equal.
+  specialize (IH n (c + 1) A).
+  assert (H : c + 1 + m = c + S m). { lia. }
+  rewrite H in IH.
+  by rewrite IH.
+Qed.
+
+Lemma fsubst_nforall : ∀ m n t A,
+  fsubst n t (m#∀ A) = m#∀ (fsubst (n + m) (tshift m 0 t) A).
+Proof.
+  elim => [|m IH] n t A //=.
+  by rewrite Nat.add_0_r tshift_zero.
+  f_equal.
+  specialize (IH (n + 1) (tshift 1 0 t) A).
+  assert (H : n + 1 + m = n + S m); first lia; rewrite H in IH; clear H.
+  rewrite -tshift_add in IH.
+  assert (H : m + 1 = S m); first lia; rewrite H in IH; clear H.
+  done.
+Qed.
+
 Lemma fshift_nexists : ∀ m n c A,
   fshift n c m#∃ A = m#∃ (fshift n (c + m) A).
 Proof.
@@ -162,6 +219,31 @@ Proof.
   assert (H : c + 1 + m = c + S m). { lia. }
   rewrite H in IH.
   by rewrite IH.
+Qed.
+
+Lemma funshift_nexists : ∀ m n c A,
+  funshift n c m#∃ A = m#∃ (funshift n (c + m) A).
+Proof.
+  elim => [n c A |m IH n c A]//=.
+  by rewrite Nat.add_0_r.
+  f_equal.
+  specialize (IH n (c + 1) A).
+  assert (H : c + 1 + m = c + S m). { lia. }
+  rewrite H in IH.
+  by rewrite IH.
+Qed.
+
+Lemma fsubst_nexists : ∀ m n t A,
+  fsubst n t (m#∃ A) = m#∃ (fsubst (n + m) (tshift m 0 t) A).
+Proof.
+  elim => [|m IH] n t A //=.
+  by rewrite Nat.add_0_r tshift_zero.
+  f_equal.
+  specialize (IH (n + 1) (tshift 1 0 t) A).
+  assert (H : n + 1 + m = n + S m); first lia; rewrite H in IH; clear H.
+  rewrite -tshift_add in IH.
+  assert (H : m + 1 = S m); first lia; rewrite H in IH; clear H.
+  done.
 Qed.
 
 (** ** Shifting and arithmetic *)
@@ -722,6 +804,15 @@ Proof.
   apply proper_exists. by apply IH.
 Qed.
 
+Add Morphism funshift with signature
+  eq ==> eq ==> eqderiv ==> eqderiv
+  as proper_funshift.
+Proof.
+  move => n c A B H.
+  induction A, B; auto.
+  eqd.
+Admitted.
+
 Lemma proper_cons_left_deriv A B Γ C :
   A ⟺ B -> 
   A :: Γ ⟹ C <-> B :: Γ ⟹ C.
@@ -1064,6 +1155,30 @@ Proof.
   pimpL 1; isrch. L. R. apply imp_intro_r_inv. rewrite H. isrch.
 Qed.
 
+Lemma nforall_one A :
+  #∀ A = 1#∀ A.
+Proof.
+  done.
+Qed.
+
+Lemma nexists_one A :
+  #∃ A = 1#∃ A.
+Proof.
+  done.
+Qed.
+
+Lemma nforall_add : ∀ n m A,
+  n#∀ (m#∀ A) = (n + m)#∀ A.
+Proof.
+  elim => [|n IHn] m A //=. by rewrite IHn.
+Qed.
+
+Lemma nexists_add : ∀ n m A,
+  n#∃ (m#∃ A) = (n + m)#∃ A.
+Proof.
+  elim => [|n IHn] m A //=. by rewrite IHn.
+Qed.
+
 Lemma forall_vacuous A :
   A ⟺ #∀ (fshift 1 0 A).
 Proof.
@@ -1074,6 +1189,17 @@ Proof.
     rewrite funshift_fshift; passum.
 Qed.
 
+Lemma nforall_vacuous : ∀ n A,
+  A ⟺ n#∀ (fshift n 0 A).
+Proof.
+  elim => [|n IHn] A //=.
+  by rewrite fshift_zero.
+  specialize (IHn A). rewrite {1}IHn.
+  rewrite fshift_succ.
+  rewrite nforall_one nforall_add Nat.add_comm -nforall_add /=.
+  by rewrite -forall_vacuous.
+Qed.
+
 Lemma exists_vacuous A :
   A ⟺ #∃ (fshift 1 0 A).
 Proof.
@@ -1081,6 +1207,17 @@ Proof.
   pexR (TVar 0).
   rewrite (fsubst_fshift_vacuous A 0); first lia.
   rewrite funshift_fshift; passum.
+Qed.
+
+Lemma nexists_vacuous : ∀ n A,
+  A ⟺ n#∃ (fshift n 0 A).
+Proof.
+  elim => [|n IHn] A //=.
+  by rewrite fshift_zero.
+  specialize (IHn A). rewrite {1}IHn.
+  rewrite fshift_succ.
+  rewrite nexists_one nexists_add Nat.add_comm -nexists_add /=.
+  by rewrite -exists_vacuous.
 Qed.
 
 Lemma exists_intro_l : ∀ A B,
@@ -1111,6 +1248,109 @@ Proof.
   apply proper_forall.
   specialize (IHn A (fshift 1 0 B)).
   by rewrite [_ (S n) _ _]fshift_succ fshift_comm.
+Qed.
+
+Lemma forall_imp_switch_r A B :
+  #∀ ((fshift 1 0 A) ⊃ B) ⟺ A ⊃ #∀ B.
+Proof.
+  eqd.
+  * pfaL 1 (TVar 0).
+    rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    pimpL 1; isrch.
+    rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    passum.
+  * pimpL 1; isrch.
+    pfaL 1 (TVar 0).
+    rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    passum.
+Qed.
+
+Lemma nforall_imp_switch_r : ∀ n A B,
+  n#∀ ((fshift n 0 A) ⊃ B) ⟺ A ⊃ n#∀ B.
+Proof.
+  elim => [|n IHn] A B /=.
+  by rewrite fshift_zero.
+  assert (H : S n = n + 1). { lia. }
+  rewrite H fshift_add IHn.
+  by rewrite forall_imp_switch_r.
+Qed.
+
+Lemma exists_or_switch_r A B :
+  #∃ ((fshift 1 0 A) ∨ B) ⟺ A ∨ #∃ B.
+Proof.
+  eqd.
+  * L.
+  * R. pexR (TVar 0).
+    rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    passum.
+  * pexR (TVar 0). rewrite /=. L.
+    rewrite (fsubst_fshift_vacuous A 0); first lia.
+    rewrite funshift_fshift.
+    passum.
+  * pexR (TVar 0). rewrite /=. R.
+    rewrite fsubst_fshift_vacuous2.
+    rewrite funshift_fshift.
+    passum.
+Qed.
+
+Lemma exists_and_switch_r A B :
+  #∃ ((fshift 1 0 A) ∧ B) ⟺ A ∧ #∃ B.
+Proof.
+  eqd.
+  * pexR (TVar 0).
+    rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    passum.
+  * pexR (TVar 0). rewrite /=.
+    repeat rewrite fsubst_fshift_vacuous2 funshift_fshift.
+    isrch.
+Qed.
+
+Lemma nexists_and_switch_r : ∀ n A B,
+  n#∃ ((fshift n 0 A) ∧ B) ⟺ A ∧ n#∃ B.
+Proof.
+  elim => [|n IHn] A B /=.
+  by rewrite fshift_zero.
+  assert (H : S n = n + 1). { lia. }
+  rewrite H fshift_add IHn.
+  by rewrite exists_and_switch_r.
+Qed.
+
+Lemma forall_elim A t :
+  [#∀ A] ⟹ funshift 1 0 (fsubst 0 (tshift 1 0 t) A).
+Proof.
+  pfaL 0 t; isrch.
+Qed.
+
+Lemma nforall_elim : ∀ n A t i,
+  0 <= i <= n ->
+  [(S n)#∀ A] ⟹ n#∀ (funshift 1 i (fsubst i (tshift (S n) 0 t) A)).
+Proof.
+  elim => [|n IHn] A t i Hi /=.
+  assert (H : i = 0). { lia. }
+  rewrite H. pfaL 0 t. isrch.
+  do 2 change (#∀ ?x) with (1#∀ x).
+  do 2 rewrite nforall_add.
+  assert (H : 1 + 1 + n = (S n) + 1); first lia; rewrite H; clear H.
+  rewrite -nforall_add.
+  case (nat_eq_dec i (S n)) => Heqi.
+  * rewrite Heqi. isrch.
+    pose proof (Hcut := forall_elim (n#∀ #∀ A) t).
+    rewrite fsubst_nforall /= in Hcut.
+    rewrite [_ (fsubst _ _ _)]nforall_one in Hcut.
+    rewrite nforall_add Nat.add_comm -nforall_add /= in Hcut.
+    rewrite funshift_nforall /= in Hcut.
+    do 2 rewrite -tshift_add /= in Hcut.
+    assert (HSn : n + 1 = S n); first lia; rewrite HSn in Hcut; clear HSn.
+    done.
+  * rewrite nforall_add Nat.add_comm -nforall_add /=.
+    isrch. pfaL 0 (TVar 0).
+    rewrite fsubst_fshift funshift_fshift.
+    rewrite nforall_one nforall_add -[1 + n]/(S n).
+    assert (H : 0 <= i <= n); first lia.
+    specialize (IHn A (tshift 1 0 t) i H).
+    rewrite -tshift_add in IHn.
+    assert (HSn : S n + 1 = S (S n)); first lia; rewrite HSn in IHn; clear HSn.
+    done.
 Qed.
 
 End Tautos.

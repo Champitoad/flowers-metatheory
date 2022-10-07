@@ -365,12 +365,14 @@ Inductive step : bouquet -> bouquet -> Prop :=
 (** *** Instantiation *)
 
 | R_ipis i t n Φ Δ :
-  n ⋅ Φ ⊢ Δ ⇀
-  [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift n 0 t) <$> Δ); n ⋅ Φ ⊢ Δ]
+  0 <= i <= n ->
+  S n ⋅ Φ ⊢ Δ ⇀
+  [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift (S n) 0 t) <$> Δ); S n ⋅ Φ ⊢ Δ]
 
 | R_ipet i t n Φ γ Δ Δ' :
+  0 <= i <= n ->
   γ ⊢ Δ ++ [n ⋅ Φ] ++ Δ ⇀
-  [γ ⊢ Δ ++ [n-1 ⋅ unshift 1 i <$> (subst i (tshift n 0 t) <$> Φ); n ⋅ Φ] ++ Δ']
+  [γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ']
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
 

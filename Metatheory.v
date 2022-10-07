@@ -34,7 +34,7 @@ Qed.
 Lemma fshift_shift (ϕ : flower) : ∀ n c,
   fshift n c ⌊ϕ⌋ ⟺ ⌊shift n c ϕ⌋.
 Proof.
-  elim/flower_induction: ϕ => [p args n c |γ Δ IHγ IHΔ n c]//=.
+  elim/flower_induction: ϕ => [p args |γ Δ IHγ IHΔ] n c //=.
   move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
   rewrite /interp/=.
   rewrite fshift_nforall/= fshift_And fshift_Or.
@@ -55,6 +55,63 @@ Proof.
     apply Forall_equiv_map. rewrite /=.
     rewrite Forall_forall in IHΨ; specialize (IHΨ n).
     rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
+    done. }
+  by rewrite H list_fmap_compose.
+Qed.
+
+Lemma funshift_shift : ∀ (ϕ : flower) n c,
+  funshift n c ⌊ϕ⌋ ⟺ ⌊unshift n c ϕ⌋.
+Proof.
+  elim/flower_induction => [p args |γ Δ IHγ IHΔ] n c //=.
+  move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
+  rewrite /interp/=.
+  rewrite funshift_nforall/= funshift_And funshift_Or.
+  rewrite Forall_forall in IHγ; specialize (IHγ n).
+  rewrite Forall_forall in IHγ; specialize (IHγ (c + m)).
+  rewrite Forall_equiv_map in IHγ.
+  rewrite IHγ.
+  rewrite -list_fmap_compose list_fmap_compose.
+  set f := λ δ : garden, funshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (unshift n (c + m + k)) <$> Ψ.
+  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
+    rewrite /f/g/h//=.
+    rewrite funshift_nexists funshift_And.
+    apply proper_nexists; auto; apply proper_And; auto.
+    rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
+    apply Forall_equiv_map. rewrite /=.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ n).
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
+    done. }
+  by rewrite H list_fmap_compose.
+Qed.
+
+Lemma fsubst_subst : ∀ (ϕ : flower) n t,
+  fsubst n t ⌊ϕ⌋ ⟺ ⌊subst n t ϕ⌋.
+Proof.
+  elim/flower_induction => [p args |γ Δ IHγ IHΔ] n t //=.
+  move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
+  rewrite /interp/=.
+  rewrite fsubst_nforall/= fsubst_And fsubst_Or.
+  rewrite Forall_forall in IHγ; specialize (IHγ (n + m)).
+  rewrite Forall_forall in IHγ; specialize (IHγ (Terms.tshift m 0 t)).
+  rewrite Forall_equiv_map in IHγ.
+  rewrite IHγ.
+  rewrite -list_fmap_compose list_fmap_compose.
+  set f := λ δ : garden, fsubst (n + m) (Terms.tshift m 0 t) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (subst (n + m + k) (Terms.tshift (m + k) 0 t)) <$> Ψ.
+  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
+    rewrite /f/g/h//=.
+    rewrite fsubst_nexists fsubst_And.
+    apply proper_nexists; auto; apply proper_And; auto.
+    rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
+    apply Forall_equiv_map. rewrite /=.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (n + m + k)).
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (Terms.tshift (m + k) 0 t)).
+    rewrite -Terms.tshift_add [k + m]Nat.add_comm.
     done. }
   by rewrite H list_fmap_compose.
 Qed.
@@ -183,39 +240,111 @@ Proof.
   apply nexists_intro_l.
 Qed.
 
-Lemma permutation_garden Φ Φ' :
-  Φ ≡ₚ Φ' ->
-  ⌊⋅Φ⌋ ⟺ ⌊⋅Φ'⌋.
+Lemma epis_pis m Ψ n Φ Φ' Δ :
+  ⟦n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ⟧ ⟺
+  ⟦n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ⟧.
 Proof.
-  elim; clear Φ Φ'.
-  * reflexivity.
-  * move => F Φ Φ' Hperm IH.
-    rewrite (cons_app _ Φ') (cons_app _ Φ).
-    repeat rewrite -/(juxt (⋅[F]) (⋅Φ)) -/(juxt (⋅[F]) (⋅Φ')) interp_juxt.
-    rewrite IH. reflexivity.
-  * move => F G Φ. simpl. rewrite and_comm. eqd.
-  * move => Φ1 Φ2 Φ3 Hperm1 H1 Hperm2 H2.
-    rewrite H1 H2. reflexivity.
+  rewrite /interp/= true_and true_and.
+  rewrite -nforall_add.
+  apply proper_nforall; auto.
+  rewrite cons_app; repeat rewrite fmap_app.
+  repeat rewrite And_app.
+  rewrite fmap_singl And_singl /= true_imp_l false_or.
+  rewrite [m#∃ _ ∧ _]and_comm and_assoc currying.
+  rewrite nexists_intro_l.
+  rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm and_assoc [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ⊃ _]currying.
+  assert (H :
+    ⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ ⋀ ⌊⌊shift m 0 <$> Φ'⌋⌋ ⟺
+    fshift m 0 (⋀ ⌊⌊Φ⌋⌋ ∧ ⋀ ⌊⌊Φ'⌋⌋)).
+  { rewrite /= fshift_And fshift_And.
+    apply proper_and;
+    apply proper_And; rewrite -list_fmap_compose;
+    apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=;
+    by rewrite fshift_shift. }
+  rewrite H.
+  rewrite nforall_imp_switch_r.
+  apply proper_imp; auto; apply proper_nforall; auto; apply proper_imp; auto.
+  rewrite fshift_Or. apply proper_Or; auto.
+  rewrite -list_fmap_compose.
+  apply Forall_equiv_map; apply equiv_Forall; move => [k Θ] /=.
+  rewrite fshift_nexists fshift_And /=.
+  apply proper_nexists; auto; apply proper_And; auto.
+  rewrite -list_fmap_compose.
+  apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
+  by apply fshift_shift.
 Qed.
 
-Lemma permutation_flower (Δ Δ' : list garden) (γ : garden) :
-  Δ ≡ₚ Δ' ->
-  ⌊γ ⊢ Δ⌋ ⟺ ⌊γ ⊢ Δ'⌋.
+Lemma epis_pet m Ψ n Φ Φ' γ Δ Δ' :
+  ⟦γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'⟧ ⟺
+  ⟦γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'⟧.
 Proof.
-  elim; clear Δ Δ'.
-  * reflexivity.
-  * move => δ Φ Φ' Hperm IH.
-    simpl in *.
-    repeat rewrite true_and in IH.
-    repeat rewrite true_and.
-    by apply proper_concl.
-  * move => δ Σ Δ. simpl.
-    repeat rewrite true_and.
-    rewrite or_assoc [⌊Σ⌋ ∨ _]or_comm -or_assoc.
-    reflexivity.
-  * move => Δ1 Δ2 Δ3 Hperm1 H1 Hperm2 H2.
-    rewrite H1 H2. reflexivity.
+  rewrite /interp/= true_and true_and. case γ => [k Θ].
+  apply proper_nforall; auto; apply proper_imp; auto.
+  rewrite cons_app; repeat rewrite fmap_app.
+  repeat rewrite Or_app.
+  apply proper_or; auto; apply proper_or; auto.
+  rewrite cons_app; repeat rewrite fmap_app /=.
+  rewrite true_imp_l. repeat rewrite false_or.
+  rewrite cons_app; repeat rewrite fmap_app /=.
+  repeat rewrite And_app. rewrite And_singl.
+  rewrite -nexists_add.
+  apply proper_nexists; auto.
+  rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm [⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ _]and_assoc.
+  assert (H :
+    ⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ ⋀ ⌊⌊shift m 0 <$> Φ'⌋⌋ ⟺
+    fshift m 0 (⋀ ⌊⌊Φ⌋⌋ ∧ ⋀ ⌊⌊Φ'⌋⌋)).
+  { rewrite /= fshift_And fshift_And.
+    apply proper_and;
+    apply proper_And; rewrite -list_fmap_compose;
+    apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=;
+    by rewrite fshift_shift. }
+  rewrite H.
+  rewrite nexists_and_switch_r.
+  eqd.
 Qed.
+
+Lemma ipis i t n Φ Δ :
+  0 <= i <= n ->
+  ⟦S n ⋅ Φ ⊢ Δ⟧ ⟺
+  ⟦[(n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ) ⊢
+    gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)); S n ⋅ Φ ⊢ Δ]⟧.
+Proof.
+  intros Hi.
+  rewrite /interp/= true_and.
+  eqd.
+  * rewrite nforall_one nforall_add.
+    assert (H : 1 + n = S n); first lia; rewrite H; clear H.
+    set A := ⋀ ⌊⌊Φ⌋⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ).
+    assert (H :
+      funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) A) ⟺
+      ⋀ ⌊⌊unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)⌋⌋
+       ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$>
+            (gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)))).
+    { rewrite /A/=.
+      rewrite fsubst_And funshift_And.
+      rewrite fsubst_Or funshift_Or.
+      apply proper_imp.
+      * apply proper_And.
+        do 2 rewrite -list_fmap_compose.
+        apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
+        by rewrite fsubst_subst funshift_shift.
+      * apply proper_Or.
+        do 2 rewrite -list_fmap_compose.
+        apply Forall_equiv_map; apply equiv_Forall; move => [k Ψ] /=.
+        rewrite fsubst_nexists funshift_nexists.
+        rewrite fsubst_And funshift_And.
+        apply proper_nexists; auto; apply proper_And.
+        do 2 rewrite -list_fmap_compose.
+        apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
+        by rewrite fsubst_subst funshift_shift. }
+    rewrite -H.
+    by apply nforall_elim.
+  * pweak 0. rewrite /=.
+    pfaL 0 (Terms.TVar 0).
+    rewrite fsubst_fshift funshift_fshift.
+    passum.
+Qed.
+
 
 Lemma local_soundness : ∀ (γ δ : garden),
   γ ⇀ δ -> ⌊γ⌋ ⟺ ⌊δ⌋.
