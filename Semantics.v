@@ -804,15 +804,6 @@ Proof.
   apply proper_exists. by apply IH.
 Qed.
 
-Add Morphism funshift with signature
-  eq ==> eq ==> eqderiv ==> eqderiv
-  as proper_funshift.
-Proof.
-  move => n c A B H.
-  induction A, B; auto.
-  eqd.
-Admitted.
-
 Lemma proper_cons_left_deriv A B Γ C :
   A ⟺ B -> 
   A :: Γ ⟹ C <-> B :: Γ ⟹ C.

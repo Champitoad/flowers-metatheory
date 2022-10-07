@@ -32,7 +32,7 @@ Proof.
 Qed.
 
 Lemma fshift_shift (ϕ : flower) : ∀ n c,
-  fshift n c ⌊ϕ⌋ ⟺ ⌊shift n c ϕ⌋.
+  fshift n c ⌊ϕ⌋ = ⌊shift n c ϕ⌋.
 Proof.
   elim/flower_induction: ϕ => [p args |γ Δ IHγ IHΔ] n c //=.
   move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
@@ -46,13 +46,13 @@ Proof.
   set f := λ δ : garden, fshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
   set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (shift n (c + m + k)) <$> Ψ.
-  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
     rewrite /f/g/h//=.
     rewrite fshift_nexists fshift_And.
-    apply proper_nexists; auto; apply proper_And; auto.
+    do 2 f_equal.
     rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
-    apply Forall_equiv_map. rewrite /=.
+    apply Forall_eq_map. rewrite /=.
     rewrite Forall_forall in IHΨ; specialize (IHΨ n).
     rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
     done. }
@@ -60,7 +60,7 @@ Proof.
 Qed.
 
 Lemma funshift_shift : ∀ (ϕ : flower) n c,
-  funshift n c ⌊ϕ⌋ ⟺ ⌊unshift n c ϕ⌋.
+  funshift n c ⌊ϕ⌋ = ⌊unshift n c ϕ⌋.
 Proof.
   elim/flower_induction => [p args |γ Δ IHγ IHΔ] n c //=.
   move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
@@ -74,13 +74,13 @@ Proof.
   set f := λ δ : garden, funshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
   set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (unshift n (c + m + k)) <$> Ψ.
-  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
     rewrite /f/g/h//=.
     rewrite funshift_nexists funshift_And.
-    apply proper_nexists; auto; apply proper_And; auto.
+    do 2 f_equal.
     rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
-    apply Forall_equiv_map. rewrite /=.
+    apply Forall_eq_map. rewrite /=.
     rewrite Forall_forall in IHΨ; specialize (IHΨ n).
     rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
     done. }
@@ -88,7 +88,7 @@ Proof.
 Qed.
 
 Lemma fsubst_subst : ∀ (ϕ : flower) n t,
-  fsubst n t ⌊ϕ⌋ ⟺ ⌊subst n t ϕ⌋.
+  fsubst n t ⌊ϕ⌋ = ⌊subst n t ϕ⌋.
 Proof.
   elim/flower_induction => [p args |γ Δ IHγ IHΔ] n t //=.
   move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
@@ -102,13 +102,13 @@ Proof.
   set f := λ δ : garden, fsubst (n + m) (Terms.tshift m 0 t) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
   set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (subst (n + m + k) (Terms.tshift (m + k) 0 t)) <$> Ψ.
-  assert (H : Forall2 eqderiv (f <$> Δ) (g ∘ h <$> Δ)).
+  assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
     rewrite /f/g/h//=.
     rewrite fsubst_nexists fsubst_And.
-    apply proper_nexists; auto; apply proper_And; auto.
+    do 2 f_equal.
     rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
-    apply Forall_equiv_map. rewrite /=.
+    apply Forall_eq_map. rewrite /=.
     rewrite Forall_forall in IHΨ; specialize (IHΨ (n + m + k)).
     rewrite Forall_forall in IHΨ; specialize (IHΨ (Terms.tshift (m + k) 0 t)).
     rewrite -Terms.tshift_add [k + m]Nat.add_comm.
@@ -271,7 +271,7 @@ Proof.
   apply proper_nexists; auto; apply proper_And; auto.
   rewrite -list_fmap_compose.
   apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
-  by apply fshift_shift.
+  by rewrite fshift_shift.
 Qed.
 
 Lemma epis_pet m Ψ n Φ Φ' γ Δ Δ' :
