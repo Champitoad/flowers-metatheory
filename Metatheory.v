@@ -303,6 +303,17 @@ Proof.
   eqd.
 Qed.
 
+Lemma pet γ Δ Δ' :
+  ⟦γ ⊢ Δ ++ [∅] ++ Δ'⟧ ⟺
+  ⟦[]⟧.
+Proof.
+  rewrite /interp/=. case γ => [m Ψ].
+  rewrite cons_app; repeat rewrite fmap_app. rewrite fmap_singl.
+  repeat rewrite Or_app /=.
+  rewrite or_assoc true_or or_comm true_or true_imp_r true_nforall.
+  eqd.
+Qed.
+
 Lemma ipis i t n Φ Δ :
   0 <= i <= n ->
   ⟦S n ⋅ Φ ⊢ Δ⟧ ⟺
@@ -360,7 +371,6 @@ Proof.
   apply proper_or; auto.
   split. pright. isrch. rewrite false_or.
   rewrite nexists_one nexists_add -[1 + n]/(S n).
-  Check nexists_intro.
   assert (H :
     funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) ⋀ ⌊⌊Φ⌋⌋) ⟺
     ⋀ ⌊⌊unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)⌋⌋).
@@ -373,57 +383,52 @@ Proof.
   by apply nexists_intro.
 Qed.
 
-Lemma local_soundness : ∀ (γ δ : garden),
-  γ ⇀ δ -> ⌊γ⌋ ⟺ ⌊δ⌋.
+Lemma local_soundness : ∀ (Φ Ψ : bouquet),
+  Φ ⇀ Ψ -> ⟦Φ⟧ ⟺ ⟦Ψ⟧.
 Proof.
   move => x y.
   elim; clear x y; intros.
 
   (* Pollination *)
 
-  * symmetry. by apply wind_pollination.
-  * by apply wind_pollination.
-  * by apply self_pollination.
-  * symmetry. by apply self_pollination.
+  * by apply pollination.
+  * symmetry; by apply pollination.
+
+  (* Empty pistil *)
+
+  * by apply epis_pis.
+  * by apply epis_pet.
+  * symmetry. by apply epis_pis.
+  * symmetry. by apply epis_pet.
+
+  (* Empty petal *)
+
+  * by apply pet.
 
   (* Reproduction *)
 
-  * symmetry. by apply reproduction.
+  * by apply reproduction.
 
-  (* Decomposition *)
+  (* Instantiation *)
 
-  * rewrite //=; eqd. pimpL 0; isrch. pleft.
-  * rewrite //=; eqd. pleft. pimpL 0; isrch.
-  * rewrite //=; eqd. pleft.
-
-  (* Permutation *)
-
-  * by apply permutation_garden.
-  * by apply permutation_flower.
+  * by apply ipis.
+  * by apply ipet.
 Qed.
 
-Lemma grounding : ∀ γ γ δ,
-  ⌊γ⌋ ⟺ ⌊δ⌋ ->
-  ⌊γ ! γ⌋ ⟺ ⌊γ ! δ⌋.
+Lemma grounding : ∀ X Φ Ψ,
+  ⟦Φ⟧ ⟺ ⟦Ψ⟧ ->
+  ⟦X ⋖ Φ⟧ ⟺ ⟦X ⋖ Ψ⟧.
 Proof.
-  elim/gctx_induction => [γ δ H |γ H Δ γ δ IH |γ H γ Δ Δ' Σ δ IH |ϕ H Φ Gs γ δ IH];
-  rewrite /=; list_simplifier.
-  * repeat rewrite flower_flowers -garden_flowers. exact.
-  * repeat rewrite true_and. rewrite (H _ _ IH). reflexivity.
-  * repeat rewrite true_and. rewrite (H _ _ IH). reflexivity.
-  * rewrite And_app And_app. rewrite -[gl _]app_nil_r. rewrite (H _ _ IH).
-    rewrite app_nil_r -And_app -And_app. reflexivity.
-Qed.
+  elim.
+Admitted.
 
-Theorem soundness : ∀ γ δ,
-  γ ~>* δ -> ⌊γ⌋ ⟺ ⌊δ⌋.
+Theorem soundness : ∀ Φ Ψ,
+  Φ ~>* Ψ -> ⟦Φ⟧ ⟺ ⟦Ψ⟧.
 Proof.
   move => x y.
-  elim => [γ |γ δ Σ Hstep H IH] //.
-  clear x y.
-  * reflexivity.
-  * rewrite -IH. elim: Hstep => γ γ' δ' H'.
-    apply grounding. by apply local_soundness.
+  elim => [Φ |Φ1 Φ2 Φ3 Hstep H IH] //.
+  rewrite -IH. elim: Hstep => X Φ Ψ Hstep.
+  apply grounding. by apply local_soundness.
 Qed.
 
 End Soundness.

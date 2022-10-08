@@ -905,6 +905,25 @@ Proof.
   eqd. pimpL 0; isrch.
 Qed.
 
+Lemma true_imp_r A :
+  A ⊃ ⊤ ⟺ ⊤.
+Proof.
+  eqd.
+Qed.
+
+Lemma true_forall :
+  #∀ ⊤ ⟺ ⊤.
+Proof.
+  eqd.
+Qed.
+
+Lemma true_nforall : ∀ n,
+  n#∀ ⊤ ⟺ ⊤.
+Proof.
+  elim => [|n IHn] //=.
+  rewrite IHn. eqd.
+Qed.
+
 Lemma false_and A :
   A ∧ ⊥ ⟺ ⊥.
 Proof.

@@ -352,8 +352,8 @@ Inductive step : bouquet -> bouquet -> Prop :=
 
 (** *** Empty petal *)
 
-| R_pet	n γ Δ Δ' :
-  γ ⊢ Δ ++ [n ⋅ []] ++ Δ' ⇀
+| R_pet	γ Δ Δ' :
+  γ ⊢ Δ ++ [∅] ++ Δ' ⇀
   []
 
 (** *** Reproduction *)
