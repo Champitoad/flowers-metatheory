@@ -419,8 +419,17 @@ Lemma grounding : ∀ X Φ Ψ,
   ⟦Φ⟧ ⟺ ⟦Ψ⟧ ->
   ⟦X ⋖ Φ⟧ ⟺ ⟦X ⋖ Ψ⟧.
 Proof.
-  elim.
-Admitted.
+  elim => [Φ Ψ |Φ1 X IHX Φ2 Φ Ψ |n X IHX Δ Φ Ψ |γ Δ n X IHX Δ' Φ Ψ] H //=;
+  rewrite /interp/= in H IHX |- *.
+  * repeat rewrite fmap_app And_app.
+    rewrite (IHX Φ Ψ) //.
+  * rewrite (IHX Φ Ψ) //.
+  * case: γ => [m Θ].
+    do 2 rewrite [_ :: Δ']cons_app.
+    repeat rewrite fmap_app; do 2 rewrite fmap_singl.
+    repeat rewrite Or_app; do 2 rewrite Or_singl.
+    rewrite (IHX Φ Ψ) //.
+Qed.
 
 Theorem soundness : ∀ Φ Ψ,
   Φ ~>* Ψ -> ⟦Φ⟧ ⟺ ⟦Ψ⟧.
