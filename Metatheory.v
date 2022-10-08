@@ -59,7 +59,7 @@ Proof.
   by rewrite H list_fmap_compose.
 Qed.
 
-Lemma funshift_shift : ∀ (ϕ : flower) n c,
+Lemma funshift_unshift : ∀ (ϕ : flower) n c,
   funshift n c ⌊ϕ⌋ = ⌊unshift n c ϕ⌋.
 Proof.
   elim/flower_induction => [p args |γ Δ IHγ IHΔ] n c //=.
@@ -327,7 +327,7 @@ Proof.
       * apply proper_And.
         do 2 rewrite -list_fmap_compose.
         apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
-        by rewrite fsubst_subst funshift_shift.
+        by rewrite fsubst_subst funshift_unshift.
       * apply proper_Or.
         do 2 rewrite -list_fmap_compose.
         apply Forall_equiv_map; apply equiv_Forall; move => [k Ψ] /=.
@@ -336,7 +336,7 @@ Proof.
         apply proper_nexists; auto; apply proper_And.
         do 2 rewrite -list_fmap_compose.
         apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
-        by rewrite fsubst_subst funshift_shift. }
+        by rewrite fsubst_subst funshift_unshift. }
     rewrite -H.
     by apply nforall_elim.
   * pweak 0. rewrite /=.
@@ -345,6 +345,33 @@ Proof.
     passum.
 Qed.
 
+Lemma ipet i t n Φ γ Δ Δ' :
+  0 <= i <= n ->
+  ⟦γ ⊢ Δ ++ [S n ⋅ Φ] ++ Δ'⟧ ⟺
+  ⟦γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'⟧.
+Proof.
+  intros Hi.
+  rewrite /interp/= true_and true_and. case: γ => [m Ψ].
+  apply proper_nforall; auto; apply proper_imp; auto.
+  rewrite cons_app [(n ⋅ _) :: _]cons_app. repeat rewrite fmap_app.
+  repeat rewrite Or_app.
+  apply proper_or; auto.
+  rewrite or_assoc.
+  apply proper_or; auto.
+  split. pright. isrch. rewrite false_or.
+  rewrite nexists_one nexists_add -[1 + n]/(S n).
+  Check nexists_intro.
+  assert (H :
+    funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) ⋀ ⌊⌊Φ⌋⌋) ⟺
+    ⋀ ⌊⌊unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)⌋⌋).
+  { rewrite fsubst_And funshift_And.
+    apply proper_And.
+    do 2 rewrite -list_fmap_compose.
+    apply Forall_equiv_map; apply equiv_Forall; move => ϕ /=.
+    by rewrite fsubst_subst funshift_unshift. }
+  rewrite -H.
+  by apply nexists_intro.
+Qed.
 
 Lemma local_soundness : ∀ (γ δ : garden),
   γ ⇀ δ -> ⌊γ⌋ ⟺ ⌊δ⌋.

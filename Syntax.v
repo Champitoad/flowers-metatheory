@@ -371,8 +371,8 @@ Inductive step : bouquet -> bouquet -> Prop :=
 
 | R_ipet i t n Φ γ Δ Δ' :
   0 <= i <= n ->
-  γ ⊢ Δ ++ [n ⋅ Φ] ++ Δ ⇀
-  [γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ']
+  γ ⊢ Δ ++ [S n ⋅ Φ] ++ Δ' ⇀
+  γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
 

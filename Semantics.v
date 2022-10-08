@@ -1319,12 +1319,8 @@ Proof.
   elim => [|n IHn] A t i Hi /=.
   assert (H : i = 0). { lia. }
   rewrite H. pfaL 0 t. isrch.
-  do 2 change (#∀ ?x) with (1#∀ x).
-  do 2 rewrite nforall_add.
-  assert (H : 1 + 1 + n = (S n) + 1); first lia; rewrite H; clear H.
-  rewrite -nforall_add.
   case (nat_eq_dec i (S n)) => Heqi.
-  * rewrite Heqi. isrch.
+  * rewrite Heqi /=.
     pose proof (Hcut := forall_elim (n#∀ #∀ A) t).
     rewrite fsubst_nforall /= in Hcut.
     rewrite [_ (fsubst _ _ _)]nforall_one in Hcut.
@@ -1332,11 +1328,41 @@ Proof.
     rewrite funshift_nforall /= in Hcut.
     do 2 rewrite -tshift_add /= in Hcut.
     assert (HSn : n + 1 = S n); first lia; rewrite HSn in Hcut; clear HSn.
+    rewrite [#∀ (n#∀ A)]nforall_one nforall_add Nat.add_comm -nforall_add /=.
     done.
-  * rewrite nforall_add Nat.add_comm -nforall_add /=.
-    isrch. pfaL 0 (TVar 0).
+  * isrch. pfaL 0 (TVar 0).
     rewrite fsubst_fshift funshift_fshift.
     rewrite nforall_one nforall_add -[1 + n]/(S n).
+    assert (H : 0 <= i <= n); first lia.
+    specialize (IHn A (tshift 1 0 t) i H).
+    rewrite -tshift_add in IHn.
+    assert (HSn : S n + 1 = S (S n)); first lia; rewrite HSn in IHn; clear HSn.
+    done.
+Qed.
+
+Lemma exists_intro A t :
+  [funshift 1 0 (fsubst 0 (tshift 1 0 t) A)] ⟹ #∃ A.
+Proof.
+  pexR t; isrch.
+Qed.
+
+Lemma nexists_intro : ∀ n A t i,
+  0 <= i <= n ->
+  [n#∃ (funshift 1 i (fsubst i (tshift (S n) 0 t) A))] ⟹ (S n)#∃ A.
+Proof.
+  elim => [|n IHn] A t i Hi /=.
+  assert (H : i = 0). { lia. }
+  rewrite H. pexR t; isrch.
+  case (nat_eq_dec i (S n)) => Heqi.
+  * rewrite Heqi.
+    pose proof (Hcut := exists_intro (#∃ (n#∃ A)) t).
+    rewrite /= fsubst_nexists funshift_nexists /= in Hcut.
+    do 2 rewrite -tshift_add in Hcut.
+    assert (H : n + 1 + 1 = S (S n)); first lia; rewrite H in Hcut; clear H.
+    done.
+  * isrch. pexR (TVar 0). rewrite /=.
+    rewrite fsubst_fshift funshift_fshift.
+    rewrite nexists_one nexists_add -[1 + n]/(S n).
     assert (H : 0 <= i <= n); first lia.
     specialize (IHn A (tshift 1 0 t) i H).
     rewrite -tshift_add in IHn.
