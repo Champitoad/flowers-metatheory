@@ -59,6 +59,13 @@ Proof.
   by rewrite H list_fmap_compose.
 Qed.
 
+Lemma fshift_bshift (Ψ : bouquet) : ∀ n c,
+  fshift n c ⟦Ψ⟧ = ⟦shift n c <$> Ψ⟧.
+Proof.
+  elim: Ψ => [|ϕ Φ IH] n c //=.
+  rewrite IH /interp fshift_shift //.
+Qed.
+
 Lemma funshift_unshift : ∀ (ϕ : flower) n c,
   funshift n c ⌊ϕ⌋ = ⌊unshift n c ϕ⌋.
 Proof.
@@ -85,6 +92,13 @@ Proof.
     rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + k)).
     done. }
   by rewrite H list_fmap_compose.
+Qed.
+
+Lemma funshift_bunshift (Ψ : bouquet) : ∀ n c,
+  funshift n c ⟦Ψ⟧ = ⟦unshift n c <$> Ψ⟧.
+Proof.
+  elim: Ψ => [|ϕ Φ IH] n c //=.
+  rewrite IH /interp funshift_unshift //.
 Qed.
 
 Lemma fsubst_subst : ∀ (ϕ : flower) n t,
@@ -116,24 +130,31 @@ Proof.
   by rewrite H list_fmap_compose.
 Qed.
 
-Lemma wpol X : ∀ (ϕ : flower),
-  ⟦ϕ⟧ ∧ ⟦X ⋖ shift (bv X) 0 ϕ⟧ ⟺
-  ⟦ϕ⟧ ∧ ⟦X ⋖ []⟧.
+Lemma fsubst_bsubst (Ψ : bouquet) : ∀ n c,
+  fsubst n c ⟦Ψ⟧ = ⟦subst n c <$> Ψ⟧.
+Proof.
+  elim: Ψ => [|ϕ Φ IH] n c //=.
+  rewrite IH /interp fsubst_subst //.
+Qed.
+
+Lemma wpol X : ∀ (Ψ : bouquet),
+  ⟦Ψ⟧ ∧ ⟦X ⋖ (shift (bv X) 0 <$> Ψ)⟧ ⟺
+  ⟦Ψ⟧ ∧ ⟦X ⋖ []⟧.
 Proof.
   induction X; intro;
   rewrite /interp//=;
   repeat rewrite true_and.
-  * rewrite shift_zero. eqd.
+  * rewrite bshift_zero. eqd.
   * repeat rewrite fmap_app And_app.
-    rewrite and_assoc [(⌊ϕ⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⌊ϕ⌋) ∧ _]and_assoc.
-    pose proof (IH := IHX ϕ); rewrite /interp/= true_and in IH.
+    rewrite and_assoc [(⋀ ⌊⌊Ψ⌋⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⋀ ⌊⌊Ψ⌋⌋) ∧ _]and_assoc.
+    pose proof (IH := IHX Ψ); rewrite /interp/= in IH.
     rewrite IH; eqd.
   * repeat rewrite wpol_nforall; apply proper_nforall; auto.
     repeat rewrite [_ ∧ (⋀ _ ⊃ _)]wpol_imp_l; apply proper_and; auto.
     apply proper_imp; auto.
-    pose proof (IH := IHX (shift n 0 ϕ)).
+    pose proof (IH := IHX (shift n 0 <$> Ψ)).
     repeat rewrite interp_flower in IH.
-    rewrite -fshift_shift shift_comm -shift_add /interp/= in IH.
+    rewrite -fshift_bshift bshift_comm -bshift_add /interp/= in IH.
     by rewrite IH.
   * case γ => [k Φ].
     repeat rewrite wpol_nforall; apply proper_nforall; auto.
@@ -146,10 +167,9 @@ Proof.
     apply proper_or; auto.
     repeat rewrite Or_singl.
     repeat rewrite wpol_nexists; apply proper_nexists; auto.
-    pose proof (IH := IHX (shift n 0 (shift k 0 ϕ))).
-    repeat rewrite interp_flower in IH.
-    repeat rewrite -shift_add in IH.
-    rewrite -fshift_shift in IH.
+    pose proof (IH := IHX (shift n 0 <$> (shift k 0 <$> Ψ))).
+    repeat rewrite -bshift_add in IH.
+    rewrite -fshift_bshift in IH.
     repeat rewrite fshift_add in IH.
     repeat rewrite /interp/= true_and in IH.
     assert (Hcomm : bv X + (n + k) = k + n + bv X). { lia. }
@@ -157,22 +177,22 @@ Proof.
     by rewrite IH.
 Qed.
 
-Lemma pollination (X : ctx) : ∀ (ϕ : flower) (n : nat),
-  ϕ ≺ n in X ->
-  ⟦X ⋖ [shift n 0 ϕ]⟧ ⟺
+Lemma pollination (X : ctx) : ∀ (Ψ : bouquet) (n : nat),
+  Ψ ≺ n in X ->
+  ⟦X ⋖ (shift n 0 <$> Ψ)⟧ ⟺
   ⟦X ⋖ []⟧.
 Proof.
   intros ?? H. inv H; list_simplifier.
   * rewrite /interp/=.
-    repeat rewrite fmap_app fmap_cons.
+    repeat rewrite fmap_app.
     repeat rewrite true_and.
     apply proper_nforall; auto.
-    rewrite cons_app. repeat rewrite And_app. rewrite And_singl.
-    rewrite [⌊ϕ⌋ ∧ _]and_comm.
+    rewrite cons_app fmap_app. repeat rewrite And_app.
+    rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm.
     repeat rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_assoc.
-    repeat rewrite [_ ∧ ⌊ϕ⌋ ⊃ _]currying.
+    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ⊃ _]currying.
     apply proper_imp; auto.
-    repeat rewrite [m#∃ _ :: (_ <$> _)]cons_app.
+    rewrite [_ :: Δ']cons_app fmap_app.
     repeat rewrite Or_app.
     apply proper_concl.
     repeat rewrite [⋁ [_] ∨ _]or_comm.
@@ -182,27 +202,28 @@ Proof.
     apply proper_imp; auto.
     repeat rewrite wpol_nexists.
     apply proper_nexists; auto.
-    rewrite fshift_shift.
-    rewrite shift_add shift_comm.
-    by rewrite -interp_flower wpol.
-  * rewrite /interp [ϕ :: Φ']cons_app.
-    repeat rewrite fmap_app And_app. rewrite And_singl.
+    do 2 rewrite -/(interp (_ ⋖ _)).
+    rewrite fshift_bshift.
+    rewrite bshift_add bshift_comm.
+    by rewrite wpol.
+  * rewrite /interp. list_simplifier.
+    repeat rewrite And_app.
     apply proper_and; auto.
     rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_comm.
     rewrite -[_ ∧ ⋀ ⌊⌊Φ⌋⌋]and_assoc.
-    repeat rewrite [_ ∧ ⌊ϕ⌋ ∧ _]and_assoc.
+    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_assoc.
     apply proper_and; auto.
-    repeat rewrite [_ ∧ ⌊ϕ⌋]and_comm.
-    by rewrite -interp_flower wpol.
-  * rewrite /interp. repeat rewrite [ϕ :: _ ++ _]cons_app.
-    repeat rewrite fmap_app And_app. rewrite And_singl.
+    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋]and_comm.
+    by rewrite wpol.
+  * rewrite /interp. list_simplifier.
+    repeat rewrite And_app.
     apply proper_and; auto.
     repeat rewrite and_assoc.
     apply proper_and; auto.
     rewrite [_ ∧ ⋀ ⌊⌊Φ'⌋⌋]and_comm.
     rewrite -and_assoc -and_assoc.
     apply proper_and; auto.
-    by rewrite -interp_flower wpol.
+    by rewrite wpol.
 Qed.
 
 Lemma reproduction (Δ : list garden) n (Φ Φ' : bouquet) (Δ' : list garden) :
@@ -448,49 +469,40 @@ Section Completeness.
 
 Reserved Notation "⌈ A ⌉" (format "⌈ A ⌉", at level 0).
 
-Fixpoint interp (A : form) : garden :=
+Fixpoint finterp (A : form) : bouquet :=
   match A with
-  | #a => ♯a
-  | ⊤ => ∅
+  | FAtom p args => Atom p args
+  | ⊤ => []
   | ⊥ => ∅ ⊢
-  | A ∧ B => ⌈A⌉ ∪ ⌈B⌉
-  | A ∨ B => ⊢ [⌈A⌉; ⌈B⌉]
-  | A ⊃ B => ⌈A⌉ ⊢ [⌈B⌉]
+  | A ∧ B => ⌈A⌉ ++ ⌈B⌉
+  | A ∨ B => ⊢ [0 ⋅ ⌈A⌉; 0 ⋅ ⌈B⌉]
+  | A ⊃ B => 0 ⋅ ⌈A⌉ ⊢ [0 ⋅ ⌈B⌉]
+  | #∀ A => 1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]
+  | #∃ A => ⊢ [1 ⋅ ⌈A⌉]
   end
+where "⌈ A ⌉" := (finterp A).
 
-where "⌈ A ⌉" := (interp A).
+Notation "⌈[ Γ ]⌉" := (A ← Γ; ⌈A⌉).
 
-Notation "⌈[ γ ]⌉" := (interp <$> γ).
-
-Lemma interp_And : ∀ (γ : list form),
-  ⌈⋀ γ⌉ = ⋃ ⌈[γ]⌉.
+Lemma finterp_And : ∀ (Γ : list form),
+  ⌈⋀ Γ⌉ = ⌈[Γ]⌉.
 Proof.
-  elim => [|A γ IH] //=. by rewrite IH.
-Qed.
-
-Lemma Juxt_Bind : ∀ (Δ : list garden),
-  ⋃ Δ = ⋅(δ ← Δ; gl δ).
-Proof.
-  elim => [|δ Δ IH] //=. case δ => Φ. rewrite IH //=.
-Qed.
-
-Global Instance Juxt_Permutation : Proper ((≡ₚ) ==> (≡ₚ)) Juxt.
-Proof.
-  repeat red. move => Δ Δ' H.
-  repeat rewrite Juxt_Bind. apply (bind_Permutation gl Δ Δ' H).
+  elim => [|A Γ IH] //=. by rewrite IH.
 Qed.
 
 Theorem completeness Γ C :
   Γ c⟹ C ->
-  ⌈⋀ Γ⌉ ⊢ [⌈C⌉] ~>* ∅.
+  ⌈⋀ Γ ⊃ C⌉ ~>* [].
 Proof.
-  elim =>/=; clear γ C.
+  elim =>/=; clear Γ C.
 
   (* Axiom *)
-  * move => A γ.
-    case ⌈A⌉ => As; case ⌈⋀ γ⌉ => γs; simpl.
+  * move => A Γ Γ'.
+    rstepm [0;1] (@nil flower). rself.
+    pose proof (H := R_pol ⌈A⌉ 0).
+    set X := (bpath [0;1])
+    eapply H.
 
-    rstepm [0;1] ∅. rself.
     rspol □ (⋅As) (⋅γs) (@nil garden).
     rstep ∅. rself. apply R_pet.
     reflexivity.
@@ -640,7 +652,7 @@ Proof.
 
     have H : ⌈⋀ γ⌉ ≡ₚ ⌈⋀ γ'⌉.
     { clear C Ip1 IH1.
-      repeat rewrite interp_And.
+      repeat rewrite finterp_And.
       apply Juxt_Permutation.
       by apply fmap_Permutation. }
 

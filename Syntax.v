@@ -19,6 +19,9 @@ Coercion ftog : flower >-> garden.
 Definition ftob : flower -> bouquet := λ ϕ, [ϕ].
 Coercion ftob : flower >-> bouquet.
 
+Definition btog : bouquet -> garden := λ Φ, (0, Φ).
+Coercion btog : bouquet >-> garden.
+
 Notation "∅" := (0, nil).
 Notation "n ⋅ Φ" := (n, Φ) (format "n  ⋅  Φ", at level 63).
 
@@ -145,9 +148,30 @@ Proof.
   by rewrite -shift_add Nat.add_comm shift_add.
 Qed.
 
+Lemma bshift_zero : ∀ (Φ : bouquet) c,
+  shift 0 c <$> Φ = Φ.
+Proof.
+  intros. rewrite -{2}[Φ]map_id_ext. apply eq_map.
+  intros. by apply shift_zero.
+Qed.
+
+Lemma bshift_add : ∀ (Φ : bouquet) c n m,
+  shift (n + m) c <$> Φ = shift n c <$> (shift m c <$> Φ).
+Proof.
+  intros. rewrite -list_fmap_compose. apply eq_map.
+  intros. by apply shift_add.
+Qed.
+
+Lemma bshift_comm : ∀ (Φ : bouquet) c n m,
+  shift n c <$> (shift m c <$> Φ) = shift m c <$> (shift n c <$> Φ).
+Proof.
+  intros. do 2 rewrite -list_fmap_compose. apply eq_map.
+  intros. by apply shift_comm.
+Qed.
+
 (** ** Juxtaposition of gardens *)
 
-Definition juxt '(n ⋅ Φ) '(m ⋅ Ψ) :=
+(* Definition juxt '(n ⋅ Φ) '(m ⋅ Ψ) :=
   (n + m) ⋅ (shift m 0 <$> Φ) ++ (shift n m <$> Ψ).
 
 Definition Juxt : list garden -> garden :=
@@ -162,6 +186,21 @@ Proof.
   case γ => n Φ //=.
   pose proof (eq_map (shift 0 n) id Φ (λ ϕ, shift_zero ϕ n)).
   by rewrite H list_fmap_id.
+Qed. *)
+
+Definition juxt (Φ Ψ : bouquet) :=
+  Φ ++ Ψ.
+
+Definition Juxt : list bouquet -> bouquet :=
+  foldr app [].
+
+Infix "∪" := juxt.
+Notation "⋃ Φs" := (Juxt Φs).
+
+Lemma Juxt_Bind : ∀ (Φs : list bouquet),
+  ⋃ Φs = Φ ← Φs; Φ.
+Proof.
+  reflexivity.
 Qed.
 
 (** * Contexts *)
@@ -173,14 +212,6 @@ Inductive ctx :=
 | Petal (γ : garden) (Δ : list garden) (n : nat) (X : ctx) (Δ' : list garden).
 
 Notation "□" := Hole.
-
-(** ** Induction principles *)
-
-Section Induction.
-
-Check ctx_ind.
-
-End Induction.
 
 (** ** De Bruijn operations *)
 
@@ -298,21 +329,21 @@ Close Scope string_scope.
 
 (** * Rules *)
 
-Reserved Notation "ϕ ≺ n 'in' X" (at level 80).
+Reserved Notation "Ψ ≺ n 'in' X" (at level 80).
 
-Inductive pollin : flower -> nat -> ctx -> Prop :=
-| P_self ϕ X n Φ Φ' Δ m Δ' :
-  ϕ ≺ (m + bv X) in (Petal (n ⋅ Φ ++ [ϕ] ++ Φ') Δ m X Δ')
-| P_wind_l ϕ X Φ Φ' Φ'' :
-  ϕ ≺ (bv X) in (Planter Φ'' X (Φ ++ [ϕ] ++ Φ'))
-| P_wind_r ϕ X Φ Φ' Φ'' :
-  ϕ ≺ (bv X) in (Planter (Φ ++ [ϕ] ++ Φ') X Φ'')
-where "ϕ ≺ n 'in' X" := (pollin ϕ n X).
+Inductive pollin : bouquet -> nat -> ctx -> Prop :=
+| P_self Ψ X n Φ Φ' Δ m Δ' :
+  Ψ ≺ (m + bv X) in (Petal (n ⋅ Φ ++ Ψ ++ Φ') Δ m X Δ')
+| P_wind_l Ψ X Φ Φ' Φ'' :
+  Ψ ≺ (bv X) in (Planter Φ'' X (Φ ++ Ψ ++ Φ'))
+| P_wind_r Ψ X Φ Φ' Φ'' :
+  Ψ ≺ (bv X) in (Planter (Φ ++ Ψ ++ Φ') X Φ'')
+where "Ψ ≺ n 'in' X" := (pollin Ψ n X).
 
-Definition assum (ϕ : flower) (X : ctx) :=
-  ∃ X0 n X1, ϕ ≺ n in X1 /\ X = X0 ⪡ X1.
+Definition assum (Ψ : bouquet) (X : ctx) :=
+  ∃ X0 n X1, Ψ ≺ n in X1 /\ X = X0 ⪡ X1.
 
-Notation "ϕ ∈ X" := (assum ϕ X).
+Notation "Ψ ∈ X" := (assum Ψ X).
 
 (** ** Local rules *)
 
@@ -322,15 +353,15 @@ Inductive step : bouquet -> bouquet -> Prop :=
 
 (** *** Pollination *)
 
-| R_pol ϕ n X :
-  ϕ ≺ n in X ->
-  X ⋖ [shift n 0 ϕ] ⇀
+| R_pol (Ψ : bouquet) n X :
+  Ψ ≺ n in X ->
+  X ⋖ (shift n 0 <$> Ψ) ⇀
   X ⋖ []
 
-| R_co_pol ϕ n X :
-  ϕ ≺ n in X ->
+| R_co_pol (Ψ : bouquet) n X :
+  Ψ ≺ n in X ->
   X ⋖ [] ⇀
-  X ⋖ [shift n 0 ϕ]
+  X ⋖ (shift n 0 <$> Ψ)
 
 (** *** Empty pistil *)
 
@@ -402,50 +433,53 @@ Notation "Φ <~> Ψ" := (Φ ~>* Ψ /\ Ψ ~>* Φ) (at level 80).
 
 Ltac sub_at p :=
   match goal with
-  | |- ?γ ~>* _ => eval cbn in (bget p γ)
+  | |- ?Φ ~>* _ => eval cbn in (bget p Φ)
   end.
 
-Ltac rstep δ :=
-  apply (rtc_l cstep _ δ).
+Ltac rstep Ψ :=
+  apply (rtc_l cstep _ Ψ).
 
-Ltac rstepm p δ :=
+Ltac rstepm p Ψ :=
   match goal with
-  | |- ?γ ~>* _ =>
-      let γ' := eval cbn in (bset p δ γ) in
-      rstep γ'; list_simplifier
+  | |- ?Φ ~>* _ =>
+      let Φ' := eval cbn in (bset Ψ p Φ) in
+      match Φ' with
+      | None => idtac
+      | Some ?Φ' => rstep Φ'; list_simplifier
+      end
   end.
 
-Ltac rstepm_cons p i δ :=
+Ltac rstepm_cons p i Ψ :=
   match goal with
-  | |- ?γ ~>* _ =>
-      let γΣ := eval cbn in (bpath p γ) in
-      match γΣ with
-      | Some (?γ, ?n ⋅ ?Σ1 :: ?Σ2) =>
+  | |- ?Φ ~>* _ =>
+      let ΦΣ := eval cbn in (bpath p Φ) in
+      match ΦΣ with
+      | Some (?Φ, ?n ⋅ ?Σ1 :: ?Σ2) =>
           match i with
-          | 0 => rstepm p (n ⋅ δ ++ Σ2)
-          | 1 => rstepm p (n ⋅ Σ1 :: δ)
+          | 0 => rstepm p (n ⋅ Ψ ++ Σ2)
+          | 1 => rstepm p (n ⋅ Σ1 :: Ψ)
           end
       end
   end.
 
-Ltac rstepm_app p i δ :=
+Ltac rstepm_app p i Ψ :=
   match goal with
-  | |- ?γ ~>* _ =>
-      let γΣ := eval cbn in (bpath p γ) in
-      match γΣ with
-      | Some (?γ, ?n ⋅ ?Σ1 ++ ?Σ2) =>
+  | |- ?Φ ~>* _ =>
+      let ΦΣ := eval cbn in (bpath p Φ) in
+      match ΦΣ with
+      | Some (?Φ, ?n ⋅ ?Σ1 ++ ?Σ2) =>
           match i with
-          | 0 => rstepm p (n ⋅ δ ++ Σ2)
-          | 1 => rstepm p (n ⋅ Σ1 ++ δ)
+          | 0 => rstepm p (n ⋅ Ψ ++ Σ2)
+          | 1 => rstepm p (n ⋅ Σ1 ++ Ψ)
           end
       end
   end.
 
-Ltac rtransm p δ :=
+Ltac rtransm p Ψ :=
   match goal with
-  | |- ?γ ~>* _ =>
-      let γ' := eval cbn in (bset p δ γ) in
-      transitivity γ'; list_simplifier
+  | |- ?Φ ~>* _ =>
+      let Φ' := eval cbn in (bset Ψ p Φ) in
+      transitivity Φ'; list_simplifier
   end.
 
 Lemma fill_hole Ψ :
@@ -454,45 +488,42 @@ Proof.
   reflexivity.
 Qed.
 
-Ltac rctx γ γ δ :=
-  let H := fresh "H" in
-  pose proof (H := R_ctx γ γ δ);
-  repeat rewrite fill_hole/= in H; list_simplifier;
-  apply H; clear H.
+Ltac rctx X Φ Ψ :=
+  apply (R_ctx X Φ Ψ).
 
 Ltac rctxm p :=
   match goal with
-  | |- ?γ ⇀ ?δ =>
-      let spγ := eval cbn in (bpath p γ) in
-      let spδ := eval cbn in (bpath p δ) in
-      match spγ with
-      | Some (?γ, ?γ0) =>
-          match spδ with
-          | Some (_, ?δ0) =>
-              rctx γ γ0 δ0
+  | |- ?Φ ⇀ ?Ψ =>
+      let spΦ := eval cbn in (bpath p Φ) in
+      let spΨ := eval cbn in (bpath p Ψ) in
+      match spΦ with
+      | Some (?Φ, ?Φ0) =>
+          match spΨ with
+          | Some (_, ?Ψ0) =>
+              rctx Φ Φ0 Ψ0
           end
       end
   end.
 
-Ltac rcstepm p δ :=
+Ltac rcstepm p Ψ :=
   match goal with
-  | |- ?γ ~>* _ =>
-      let spγ := eval cbn in (bpath p γ) in
-      match spγ with
-      | Some (?γ, ?γ0) =>
-          rstepm p δ; [> rctx γ γ0 δ | ..]
+  | |- ?Φ ~>* _ =>
+      let spΦ := eval cbn in (bpath p Φ) in
+      match spΦ with
+      | Some (?Φ, ?Φ0) =>
+          rstepm p Ψ; [> rctx Φ Φ0 Ψ | ..]
       end
   end.
 
-Ltac rctxmt p δ0 :=
+Ltac rctxmt p Ψ0 :=
   match goal with
-  | |- ?γ ~>* ?δ =>
-      let spγ := eval cbn in (bpath p γ) in
-      let spδ := eval cbn in (bpath p δ) in
-      match spγ with
-      | Some (?γ, ?γ0) =>
+  | |- ?Φ ~>* ?Ψ =>
+      let spΦ := eval cbn in (bpath p Φ) in
+      let spΨ := eval cbn in (bpath p Ψ) in
+      match spΦ with
+      | Some (?Φ, ?Φ0) =>
           let H := fresh "H" in
-          pose proof (H := γ γ0 δ0);
+          pose proof (H := Φ Φ0 Ψ0);
           repeat rewrite fill_hole/= in H; list_simplifier;
           apply H; clear H
       end
@@ -500,65 +531,65 @@ Ltac rctxmt p δ0 :=
 
 Ltac rctxmH p H :=
   match type of H with
-  | _ ~>* ?δ0 =>
-      rtransm p δ0; [> rctxmt p δ0; exact H | ..]
+  | _ ~>* ?Ψ0 =>
+      rtransm p Ψ0; [> rctxmt p Ψ0; exact H | ..]
   end.
 
 Ltac rself :=
   match goal with
-  | |- ?γ ⇀ ?δ =>
-      rctx Hole γ δ
+  | |- ?Φ ~> ?Ψ =>
+      rctx □ Φ Ψ
   end.
 
-Ltac rwpol γ γ :=
+Ltac rwpol Φ Φ :=
   let Hins := fresh "H" in
   let Hdel := fresh "H" in
-  pose proof (Hins := R_pol γ γ);
-  pose proof (Hdel := R_co_pol γ γ);
+  pose proof (Hins := R_pol Φ Φ);
+  pose proof (Hdel := R_co_pol Φ Φ);
   repeat rewrite fill_hole/= in Hins, Hdel; list_simplifier;
   (exact Hins || exact Hdel);
   clear Hins Hdel.
 
 Ltac rwpolm p :=
   match goal with
-  | |- ?n ⋅ ?γ ++ ?δ ⇀ _ =>
-      let spδ := eval cbn in (bpath p (n ⋅ δ)) in
-      match spδ with
-      | Some (?γ, _) =>
-          rwpol γ (n ⋅ γ)
+  | |- ?n ⋅ ?Φ ++ ?Ψ ⇀ _ =>
+      let spΨ := eval cbn in (bpath p (n ⋅ Ψ)) in
+      match spΨ with
+      | Some (?Φ, _) =>
+          rwpol Φ (n ⋅ Φ)
       end
   end.
 
-Ltac rspol γ γ δ Δ :=
+Ltac rspol Φ Φ Ψ Δ :=
   let Hins := fresh "Hins" in
   let Hdel := fresh "Hdel" in
-  pose proof (Hins := R_pol γ γ δ Δ);
-  pose proof (Hdel := R_co_pol γ γ δ Δ);
+  pose proof (Hins := R_pol Φ Φ Ψ Δ);
+  pose proof (Hdel := R_co_pol Φ Φ Ψ Δ);
   repeat rewrite fill_hole/= in Hins, Hdel; list_simplifier;
   (exact Hins || exact Hdel);
   clear Hins Hdel.
 
 Ltac rspolm p :=
   match goal with
-  | |- ?γ ⇀ _ =>
-      let spγ := eval cbn in (bpath p γ) in
-      match spγ with
-      | Some (Planter [] (Petal ?γ' [] ?γ ?Δ') [], ?δ) =>
-          rspol γ γ' ∅ Δ'
+  | |- ?Φ ⇀ _ =>
+      let spΦ := eval cbn in (bpath p Φ) in
+      match spΦ with
+      | Some (Planter [] (Petal ?Φ' [] ?Φ ?Δ') [], ?Ψ) =>
+          rspol Φ Φ' ∅ Δ'
       end
   end.
 
 Ltac spol p :=
   match goal with
-  | |- ?n ⋅ [?γ ⊢ _] ~>* _ =>
-      rstepm p γ; [> rself; rspolm p | ..]
+  | |- ?n ⋅ [?Φ ⊢ _] ~>* _ =>
+      rstepm p Φ; [> rself; rspolm p | ..]
   end.
 
 Ltac rrep :=
   match goal with
-  | |- ?n ⋅ [?m ⋅ (∅ ⊢ ?δs) :: ?γ ⊢ ?Δ] ⇀ _ =>
+  | |- ?n ⋅ [?m ⋅ (∅ ⊢ ?Ψs) :: ?Φ ⊢ ?Δ] ⇀ _ =>
       let H := fresh "H" in
-      pose proof (H := R_rep (?m ⋅ γ) δs Δ);
+      pose proof (H := R_rep (?m ⋅ Φ) Ψs Δ);
       repeat rewrite fill_hole/= in H; list_simplifier;
       exact H; clear H
   end.
@@ -571,14 +602,14 @@ Ltac rcopis :=
 
 Ltac rpism p :=
   match sub_at p with
-  | Some ((⊢ [?δ])) =>
-      rcstepm p δ; [> rpis | ..]
+  | Some ((⊢ [?Ψ])) =>
+      rcstepm p Ψ; [> rpis | ..]
   end.
 
 Ltac rcopism p :=
   match sub_at p with
-  | Some ?δ => 
-      rcstepm p (0 ⋅ [⊢ [δ]]); [> rcopis | ..]
+  | Some ?Ψ => 
+      rcstepm p (0 ⋅ [⊢ [Ψ]]); [> rcopis | ..]
   end.
 
 Ltac rpet :=
