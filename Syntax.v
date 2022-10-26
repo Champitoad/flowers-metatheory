@@ -465,12 +465,12 @@ Ltac rstepm_cons p i Ψ :=
 Ltac rstepm_app p i Ψ :=
   match goal with
   | |- ?Φ ~>* _ =>
-      let ΦΣ := eval cbn in (bpath p Φ) in
-      match ΦΣ with
-      | Some (?Φ, ?n ⋅ ?Σ1 ++ ?Σ2) =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      match XΦ0 with
+      | Some (_, ?Φl ++ ?Φr) =>
           match i with
-          | 0 => rstepm p (n ⋅ Ψ ++ Σ2)
-          | 1 => rstepm p (n ⋅ Σ1 ++ Ψ)
+          | 0 => rstepm p (Ψ ++ Φr)
+          | 1 => rstepm p (Φr ++ Ψ)
           end
       end
   end.
@@ -493,14 +493,14 @@ Ltac rctx X Φ Ψ :=
 
 Ltac rctxm p :=
   match goal with
-  | |- ?Φ ⇀ ?Ψ =>
-      let spΦ := eval cbn in (bpath p Φ) in
-      let spΨ := eval cbn in (bpath p Ψ) in
-      match spΦ with
-      | Some (?Φ, ?Φ0) =>
-          match spΨ with
+  | |- ?Φ ~> ?Ψ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      let _Ψ0 := eval cbn in (bpath p Ψ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          match _Ψ0 with
           | Some (_, ?Ψ0) =>
-              rctx Φ Φ0 Ψ0
+              rctx X Φ0 Ψ0
           end
       end
   end.
@@ -508,10 +508,10 @@ Ltac rctxm p :=
 Ltac rcstepm p Ψ :=
   match goal with
   | |- ?Φ ~>* _ =>
-      let spΦ := eval cbn in (bpath p Φ) in
-      match spΦ with
-      | Some (?Φ, ?Φ0) =>
-          rstepm p Ψ; [> rctx Φ Φ0 Ψ | ..]
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          rstepm p Ψ; [> rctx X Φ0 Ψ |]
       end
   end.
 
@@ -532,7 +532,7 @@ Ltac rctxmt p Ψ0 :=
 Ltac rctxmH p H :=
   match type of H with
   | _ ~>* ?Ψ0 =>
-      rtransm p Ψ0; [> rctxmt p Ψ0; exact H | ..]
+      rtransm p Ψ0; [> rctxmt p Ψ0; exact H |]
   end.
 
 Ltac rself :=
@@ -582,7 +582,7 @@ Ltac rspolm p :=
 Ltac spol p :=
   match goal with
   | |- ?n ⋅ [?Φ ⊢ _] ~>* _ =>
-      rstepm p Φ; [> rself; rspolm p | ..]
+      rstepm p Φ; [> rself; rspolm p |]
   end.
 
 Ltac rrep :=
@@ -603,20 +603,20 @@ Ltac rcopis :=
 Ltac rpism p :=
   match sub_at p with
   | Some ((⊢ [?Ψ])) =>
-      rcstepm p Ψ; [> rpis | ..]
+      rcstepm p Ψ; [> rpis |]
   end.
 
 Ltac rcopism p :=
   match sub_at p with
   | Some ?Ψ => 
-      rcstepm p (0 ⋅ [⊢ [Ψ]]); [> rcopis | ..]
+      rcstepm p (0 ⋅ [⊢ [Ψ]]); [> rcopis |]
   end.
 
-Ltac rpet :=
-  apply R_pet.
+Ltac rpet Δ Δ' :=
+  apply (R_pet _ Δ Δ').
 
 Ltac rpetm p :=
-  rcstepm p ∅; [> rpet | ..].
+  rcstepm p (@nil flower); [> rpet |].
 
 Open Scope string_scope.
 

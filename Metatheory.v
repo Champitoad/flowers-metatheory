@@ -490,6 +490,20 @@ Proof.
   elim => [|A Γ IH] //=. by rewrite IH.
 Qed.
 
+Ltac rspol p Φl Φr :=
+  match goal with
+  | |- ?Φ ⇀ _ =>
+      let XΨ := eval cbn in (bpath p Φ) in
+      match XΨ with
+      | Some (Planter [] ?X [], ?Ψ) =>
+          let H := fresh "H" in
+          pose proof (H := R_pol Ψ 0 X);
+          rewrite bshift_zero /= in H;
+          apply H; rewrite finterp_And bind_app bind_cons;
+          apply (P_self _ □ 0 Φl Φr _ 0 _)
+      end
+  end.
+
 Theorem completeness Γ C :
   Γ c⟹ C ->
   ⌈⋀ Γ ⊃ C⌉ ~>* [].
@@ -499,13 +513,26 @@ Proof.
   (* Axiom *)
   * move => A Γ Γ'.
     rstepm [0;1] (@nil flower). rself.
-    pose proof (H := R_pol ⌈A⌉ 0).
-    set X := (bpath [0;1])
-    eapply H.
+    rspol [0;1] ⌈[Γ]⌉ ⌈[Γ']⌉.
 
-    rspol □ (⋅As) (⋅γs) (@nil garden).
-    rstep ∅. rself. apply R_pet.
+    rstep (@nil flower). rself.
+    rpet (@nil garden) (@nil garden).
     reflexivity.
+
+  (* Contraction *)
+  * move => A Γ Γ' Γ'' C H IH.
+    rewrite finterp_And bind_app bind_app bind_cons.
+    rewrite finterp_And bind_app bind_cons bind_app bind_cons in IH.
+
+    rstepm_app [0;0] 0 (⌈[Γ]⌉ ++ ⌈A⌉); [> |apply IH].
+    rctxm [0;0].
+    set Ψ := ⌈A⌉.
+    set X := Planter ⌈[Γ]⌉ □ (⌈[Γ']⌉ ++ ⌈A⌉ ++ ⌈[Γ'']⌉).
+    let H := fresh "H" in
+    pose proof (H := R_co_pol Ψ 0 X);
+    rewrite bshift_zero /= in H;
+    apply H.
+    apply (P_wind_l _ □).
   
   (* R⊤ *)
   * move => γ.
@@ -633,17 +660,6 @@ Proof.
     rctxmH [0;0;0;0] IH1.
 
     rpism [0;0;0].
-    exact.
-
-  (* Contraction *)
-  * move => A γ C.
-    case ⌈A⌉ => As; case ⌈C⌉ => Cs; case ⌈⋀ γ⌉ => γs; simpl.
-    move => Hp1 IH1.
-
-    rstepm_app [0;0] 0 (⋅As ++ As).
-    rctx (Planter [] (Pistil (Planter [] □ γs) [⋅Cs]) []) (⋅As) (⋅As ++ As).
-    rwpol □ (⋅As).
-
     exact.
 
   (* Permutation *)
