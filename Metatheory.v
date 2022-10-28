@@ -492,17 +492,60 @@ Qed.
 
 Ltac rspol p Φl Φr :=
   match goal with
-  | |- ?Φ ⇀ _ =>
-      let XΨ := eval cbn in (bpath p Φ) in
+  | |- ftob ?ϕ ⇀ _ =>
+              idtac "pouet";
+      let XΨ := eval cbn in (fpath p ϕ) in
       match XΨ with
-      | Some (Planter [] ?X [], ?Ψ) =>
+      | Some (?X, ?Ψ) =>
           let H := fresh "H" in
           pose proof (H := R_pol Ψ 0 X);
           rewrite bshift_zero /= in H;
-          apply H; rewrite finterp_And bind_app bind_cons;
-          apply (P_self _ □ 0 Φl Φr _ 0 _)
+          apply H;
+          match X with
+          | Petal _ _ _ ?Y _ =>
+              let H := fresh "H" in
+              epose proof (H := P_self _ Y 0 Φl Φr _ 0 _);
+              list_simplifier; apply H
+          end
       end
   end.
+
+Ltac rspolm p Φl Φr :=
+  rstepm (0 :: p) (@nil flower); [>
+    rself;
+    rspol p Φl Φr
+  |].
+
+Ltac rscopol p Φl Ψ Φr :=
+  match goal with
+  | |- [?ϕ] ⇀ _ =>
+      let XΨ := eval cbn in (fpath p ϕ) in
+      match XΨ with
+      | Some (?X, []) =>
+          let H := fresh "H" in
+          pose proof (H := R_co_pol Ψ 0 X);
+          rewrite bshift_zero /= in H;
+          apply H;
+          match X with
+          | Petal _ _ _ ?Y _ =>
+              let H := fresh "H" in
+              epose proof (H := P_self _ Y 0 Φl Φr _ 0 _);
+              list_simplifier; apply H
+          end
+      end
+  end.
+
+Ltac rscopolm p Φl Ψ Φr :=
+  rstepm (0 :: p) Ψ; [>
+    rself;
+    rscopol p Φl Ψ Φr
+  |].
+
+Theorem full_completeness Γ C :
+  Γ c⟹ C -> forall X,
+  (forall A, In A Γ -> ⌈A⌉ ∈ X) ->
+  X ⋖ ⌈C⌉ ~>* X ⋖ [].
+Admitted.
 
 Theorem completeness Γ C :
   Γ c⟹ C ->
@@ -512,14 +555,13 @@ Proof.
 
   (* Axiom *)
   * move => A Γ Γ'.
-    rstepm [0;1] (@nil flower). rself.
-    rspol [0;1] ⌈[Γ]⌉ ⌈[Γ']⌉.
+    rewrite finterp_And bind_app bind_cons.
 
-    rstep (@nil flower). rself.
-    rpet (@nil garden) (@nil garden).
+    rspolm [1] ⌈[Γ]⌉ ⌈[Γ']⌉.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
-  (* Contraction *)
+  (* Right contraction *)
   * move => A Γ Γ' Γ'' C H IH.
     rewrite finterp_And bind_app bind_app bind_cons.
     rewrite finterp_And bind_app bind_cons bind_app bind_cons in IH.
@@ -533,60 +575,76 @@ Proof.
     rewrite bshift_zero /= in H;
     apply H.
     apply (P_wind_l _ □).
-  
+
+  (* Left contraction *)
+  * move => A Γ Γ' Γ'' C H IH.
+    rewrite finterp_And bind_app bind_cons bind_app.
+    rewrite finterp_And bind_app bind_cons bind_app bind_cons in IH.
+
+    rstepm_app [0;0] 1 (⌈A⌉ ++ ⌈[ Γ' ]⌉ ++ ⌈A⌉ ++ ⌈[ Γ'' ]⌉); [> |apply IH].
+    rctxm [0;0].
+    set Ψ := ⌈A⌉.
+    set X := Planter (⌈[Γ]⌉ ++ Ψ ++ ⌈[Γ']⌉) □ ⌈[Γ'']⌉.
+    let H := fresh "H" in
+    pose proof (H := R_co_pol Ψ 0 X);
+    rewrite bshift_zero /= in H; list_simplifier;
+    apply H.
+    apply (P_wind_r _ □).
+
   (* R⊤ *)
-  * move => γ.
-  
-    rpetm (@nil nat). reflexivity.
+  * move => Γ.
+
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 
   (* R∧ *)
-  * move => A B γ.
-    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ γ⌉ => γs. simpl.
-    move => Hp1 IH1 Hp2 IH2.
+  * move => A B Γ Hp1 IH1 Hp2 IH2.
 
-    rstepm_app [0;1] 0 (⋅[⊢ [⋅As]]).
-    rctxm_app [0;1] 0.
-    rcopis.
+    rstepm_app [0;1] 0 ([⊢ [0 ⋅ ⌈A⌉]]).
+    pose proof (H := R_co_epis_pet 0 ⌈A⌉ 0 [] ⌈B⌉ (0 ⋅ ⌈⋀ Γ⌉) [] []).
+    list_simplifier; rewrite bshift_zero in H.
+    rself. apply H.
 
-    rstepm_cons [0;1] 1 (⋅[⊢ [⋅Bs]]).
-    rctxm_cons [0;1] 1.
-    rcopis.
+    rstepm_app [0;1] 1 ([⊢ [0 ⋅ ⌈B⌉]]).
+    pose proof (H := R_co_epis_pet 0 ⌈B⌉ 0 [⊢ [0 ⋅ ⌈A⌉]] [] (0 ⋅ ⌈⋀ Γ⌉) [] []).
+    list_simplifier; rewrite bshift_zero in H.
+    rself; apply H.
 
-    spol [0;1;0;0].
-    spol [0;1;1;0].
+    rscopolm [1;0;0] (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;1;0] (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
 
     rctxmH [0;1;0] IH1.
     rctxmH [0;1;0] IH2.
 
-    rpetm (@nil nat).
+    rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
   (* R∨₁ *)
-  * move => A B γ.
-    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ γ⌉ => γs.
-    move => Hp1 IH1.
+  * move => A B Γ Hp1 IH1.
 
-    rcopism [0;1;0;1].
-    spol [0;1;0;1;0;0].
+    rstepm [0;1;0;1] (⊢ [0 ⋅ ⌈A⌉]).
+    rctxm [0;1].
+    epose proof (H := R_co_epis_pet 0 _ 0 [] [] _ [] [0 ⋅ ⌈B⌉]);
+    list_simplifier; apply H.
+
+    rscopolm [1;0;1;0;0] (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;1;0] IH1.
-    rpetm [0;1].
-    rpetm (@nil nat).
+    rpetm [0;1] (@nil garden) [0 ⋅ ⌈B⌉].
+    rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
   (* R∨₂ *)
-  * move => A B γ.
-    case ⌈A⌉ => As; case ⌈B⌉ => Bs; case ⌈⋀ γ⌉ => γs.
-    move => Hp1 IH1.
+  * move => A B Γ Hp1 IH1.
 
-    rcopism [0;1;0;2].
-    spol [0;1;0;2;0;0].
+    rstepm [0;1;0;2] (⊢ [0 ⋅ ⌈B⌉]).
+    rctxm [0;1].
+    epose proof (H := R_co_epis_pet 0 _ 0 [] [] _ [0 ⋅ ⌈A⌉] []);
+    list_simplifier; apply H.
+
+    rscopolm [1;0;2;0;0] (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;2;0] IH1.
-
-    rcstepm [0;1;0] (⊢ [∅; ⋅As]).
-    apply R_perm_f; solve_Permutation.
-
-    rpetm [0;1].
-    rpetm (@nil nat).
+    rpetm [0;1] [0 ⋅ ⌈A⌉] (@nil garden).
+    rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
   (* R⊃ *)

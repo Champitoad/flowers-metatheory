@@ -248,11 +248,18 @@ Reserved Infix "⪡" (at level 15).
 Fixpoint comp (X : ctx) (Y : ctx) : ctx :=
   match X with
   | Hole => Y
-  | Planter Φ X Φ' => Planter Φ (X ⪡ Y) Φ
+  | Planter Φ X Φ' => Planter Φ (X ⪡ Y) Φ'
   | Pistil n X Δ => Pistil n (X ⪡ Y) Δ
   | Petal γ Δ n X Δ' => Petal γ Δ n (X ⪡ Y) Δ'
   end
 where "X ⪡ Y" := (comp X Y).
+
+Lemma fill_comp : ∀ X Y Φ,
+  X ⋖ (Y ⋖ Φ) = (X ⪡ Y) ⋖ Φ.
+Proof.
+  elim => [|Φl X IH Φr |n X IH Δ |γ Δ n X IH Δ'] Y Φ //=;
+  by rewrite IH.
+Qed.
 
 (** ** Path operations *)
 
@@ -427,6 +434,17 @@ Infix "~>*" := (rtc cstep) (at level 80).
 
 Notation "Φ <~> Ψ" := (Φ ~>* Ψ /\ Ψ ~>* Φ) (at level 80).
 
+Lemma cstep_congr Φ Ψ :
+  Φ ~>* Ψ -> forall X,
+  X ⋖ Φ ~>* X ⋖ Ψ.
+Proof.
+  elim {Φ Ψ} => [Φ |Φ Ψ Θ Hstep H IH] X; [> reflexivity |].
+  apply (rtc_l _ _ (X ⋖ Ψ)); [> |by apply IH].
+  elim: Hstep => X0 Φ0 Ψ0 H0.
+  rewrite fill_comp fill_comp.
+  by apply (R_ctx (X ⪡ X0) Φ0 Ψ0).
+Qed.
+
 (** * Basic proof search *)
 
 (* TODO: rewrite all tactics *)
@@ -449,19 +467,6 @@ Ltac rstepm p Ψ :=
       end
   end.
 
-Ltac rstepm_cons p i Ψ :=
-  match goal with
-  | |- ?Φ ~>* _ =>
-      let ΦΣ := eval cbn in (bpath p Φ) in
-      match ΦΣ with
-      | Some (?Φ, ?n ⋅ ?Σ1 :: ?Σ2) =>
-          match i with
-          | 0 => rstepm p (n ⋅ Ψ ++ Σ2)
-          | 1 => rstepm p (n ⋅ Σ1 :: Ψ)
-          end
-      end
-  end.
-
 Ltac rstepm_app p i Ψ :=
   match goal with
   | |- ?Φ ~>* _ =>
@@ -470,7 +475,12 @@ Ltac rstepm_app p i Ψ :=
       | Some (_, ?Φl ++ ?Φr) =>
           match i with
           | 0 => rstepm p (Ψ ++ Φr)
-          | 1 => rstepm p (Φr ++ Ψ)
+          | 1 => rstepm p (Φl ++ Ψ)
+          end
+      | Some (_, ?ϕ :: ?Φr) =>
+          match i with
+          | 0 => rstepm p (Ψ ++ Φr)
+          | 1 => rstepm p (ϕ :: Ψ)
           end
       end
   end.
@@ -479,7 +489,9 @@ Ltac rtransm p Ψ :=
   match goal with
   | |- ?Φ ~>* _ =>
       let Φ' := eval cbn in (bset Ψ p Φ) in
-      transitivity Φ'; list_simplifier
+      match Φ' with
+      | Some ?Φ' => transitivity Φ'; list_simplifier
+      end
   end.
 
 Lemma fill_hole Ψ :
@@ -505,6 +517,40 @@ Ltac rctxm p :=
       end
   end.
 
+Ltac rctxm_app p i :=
+  match goal with
+  | |- ?Φ ~> ?Ψ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      let _Ψ0 := eval cbn in (bpath p Ψ) in
+      match XΦ0 with
+      | Some (?X, ?Φl ++ ?Φr) =>
+          let Y :=
+            match i with
+            | 0 => let X' := eval cbn in (X ⪡ (Planter [] □ Φr)) in X'
+            | 1 => let X' := eval cbn in (X ⪡ (Planter Φl □ [])) in X'
+            end in
+          let Φ0 :=
+            match i with
+            | 0 => Φl
+            | 1 => Φr
+            end in
+          let Ψ0 :=
+            match i with 
+            | 0 =>
+                match _Ψ0 with
+                | Some (_, ?Ψl ++ _) => Ψl
+                | Some (_, ?ψ :: _) => constr:([ψ])
+                end
+            | 1 =>
+                match _Ψ0 with
+                | Some (_, _ ++ ?Ψr) => Ψr
+                | Some (_, _ :: ?Ψr) => Ψr
+                end
+            end in
+          rctx Y Φ0 Ψ0
+      end
+  end.
+
 Ltac rcstepm p Ψ :=
   match goal with
   | |- ?Φ ~>* _ =>
@@ -518,13 +564,11 @@ Ltac rcstepm p Ψ :=
 Ltac rctxmt p Ψ0 :=
   match goal with
   | |- ?Φ ~>* ?Ψ =>
-      let spΦ := eval cbn in (bpath p Φ) in
-      let spΨ := eval cbn in (bpath p Ψ) in
-      match spΦ with
-      | Some (?Φ, ?Φ0) =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
           let H := fresh "H" in
-          pose proof (H := Φ Φ0 Ψ0);
-          repeat rewrite fill_hole/= in H; list_simplifier;
+          epose proof (H := cstep_congr Φ0 Ψ0 _ X); list_simplifier;
           apply H; clear H
       end
   end.
@@ -560,31 +604,6 @@ Ltac rwpolm p :=
       end
   end.
 
-Ltac rspol Φ Φ Ψ Δ :=
-  let Hins := fresh "Hins" in
-  let Hdel := fresh "Hdel" in
-  pose proof (Hins := R_pol Φ Φ Ψ Δ);
-  pose proof (Hdel := R_co_pol Φ Φ Ψ Δ);
-  repeat rewrite fill_hole/= in Hins, Hdel; list_simplifier;
-  (exact Hins || exact Hdel);
-  clear Hins Hdel.
-
-Ltac rspolm p :=
-  match goal with
-  | |- ?Φ ⇀ _ =>
-      let spΦ := eval cbn in (bpath p Φ) in
-      match spΦ with
-      | Some (Planter [] (Petal ?Φ' [] ?Φ ?Δ') [], ?Ψ) =>
-          rspol Φ Φ' ∅ Δ'
-      end
-  end.
-
-Ltac spol p :=
-  match goal with
-  | |- ?n ⋅ [?Φ ⊢ _] ~>* _ =>
-      rstepm p Φ; [> rself; rspolm p |]
-  end.
-
 Ltac rrep :=
   match goal with
   | |- ?n ⋅ [?m ⋅ (∅ ⊢ ?Ψs) :: ?Φ ⊢ ?Δ] ⇀ _ =>
@@ -615,8 +634,8 @@ Ltac rcopism p :=
 Ltac rpet Δ Δ' :=
   apply (R_pet _ Δ Δ').
 
-Ltac rpetm p :=
-  rcstepm p (@nil flower); [> rpet |].
+Ltac rpetm p Δ Δ' :=
+  rcstepm p (@nil flower); [> rpet Δ Δ' |].
 
 Open Scope string_scope.
 
