@@ -155,6 +155,20 @@ Proof.
   intros. by apply shift_zero.
 Qed.
 
+Lemma gshift_zero : ∀ (γ : garden) c,
+  gshift 0 c γ = γ.
+Proof.
+  intros. rewrite /gshift. case γ => m Φ.
+  by rewrite bshift_zero.
+Qed.
+
+Lemma pshift_zero : ∀ (Δ : list garden) c,
+  gshift 0 c <$> Δ = Δ.
+Proof.
+  intros. rewrite -{2}[Δ]map_id_ext. apply eq_map.
+  intros. rewrite /gshift. by apply gshift_zero.
+Qed.
+
 Lemma bshift_add : ∀ (Φ : bouquet) c n m,
   shift (n + m) c <$> Φ = shift n c <$> (shift m c <$> Φ).
 Proof.
@@ -434,11 +448,11 @@ Infix "~>*" := (rtc cstep) (at level 80).
 
 Notation "Φ <~> Ψ" := (Φ ~>* Ψ /\ Ψ ~>* Φ) (at level 80).
 
-Lemma cstep_congr Φ Ψ :
-  Φ ~>* Ψ -> forall X,
+Lemma cstep_congr X Φ Ψ :
+  Φ ~>* Ψ ->
   X ⋖ Φ ~>* X ⋖ Ψ.
 Proof.
-  elim {Φ Ψ} => [Φ |Φ Ψ Θ Hstep H IH] X; [> reflexivity |].
+  elim {Φ Ψ} => [Φ |Φ Ψ Θ Hstep H IH]; [> reflexivity |].
   apply (rtc_l _ _ (X ⋖ Ψ)); [> |by apply IH].
   elim: Hstep => X0 Φ0 Ψ0 H0.
   rewrite fill_comp fill_comp.
@@ -490,7 +504,7 @@ Ltac rtransm p Ψ :=
   | |- ?Φ ~>* _ =>
       let Φ' := eval cbn in (bset Ψ p Φ) in
       match Φ' with
-      | Some ?Φ' => transitivity Φ'; list_simplifier
+      | Some ?Φ' => apply (rtc_transitive Φ Φ'); list_simplifier
       end
   end.
 
@@ -513,6 +527,62 @@ Ltac rctxm p :=
           match _Ψ0 with
           | Some (_, ?Ψ0) =>
               rctx X Φ0 Ψ0
+          end
+      end
+  end.
+
+Ltac rctxt p :=
+  match goal with
+  | |- ?Φ ~>* ?Ψ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      let _Ψ0 := eval cbn in (bpath p Ψ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          match _Ψ0 with
+          | Some (_, ?Ψ0) =>
+              apply (cstep_congr X Φ0 Ψ0)
+          end
+      end
+  end.
+
+Ltac rctxt_app p i :=
+  match goal with
+  | |- ?Φ ~>* ?Ψ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      let _Ψ0 := eval cbn in (bpath p Ψ) in
+
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          match _Ψ0 with
+          | Some (_, ?Ψ0) =>
+              let Φ0lr :=
+                match Φ0 with
+                | ?Φ0l ++ ?Φ0r => constr:((Φ0l, Φ0r))
+                | ?ϕ0l :: ?Φ0r => constr:(([ϕ0l], Φ0r))
+                end in
+              let Ψ0lr :=
+                match Ψ0 with
+                | ?Ψ0l ++ ?Ψ0r => constr:((Ψ0l, Ψ0r))
+                | ?Ψ0l :: ?Ψ0r => constr:(([Ψ0l], Ψ0r))
+                end in    
+              match Φ0lr with
+              | (?Φ0l, ?Φ0r) =>
+                  match Ψ0lr with
+                  | (?Ψ0l, ?Ψ0r) =>
+                      let XΦΨ0 :=
+                        match i with               
+                        | 0 => constr:((Planter [] □ Φ0r, Φ0l, Ψ0l))
+                        | 1 => constr:((Planter Φ0l □ [], Φ0r, Ψ0r))
+                        end in
+                      match XΦΨ0 with
+                      | (?X0, ?Φ0, ?Ψ0) =>
+                          let Y := eval cbn in (X ⪡ X0) in
+                          let H := fresh "H" in
+                          pose proof (H := cstep_congr Y Φ0 Ψ0); list_simplifier;
+                          apply H; clear H
+                      end
+                  end
+              end
           end
       end
   end.
@@ -561,6 +631,9 @@ Ltac rcstepm p Ψ :=
       end
   end.
 
+Ltac rctransm p Ψ0 :=
+  rtransm p Ψ0; [> rctxt p |].
+
 Ltac rctxmt p Ψ0 :=
   match goal with
   | |- ?Φ ~>* ?Ψ =>
@@ -568,7 +641,7 @@ Ltac rctxmt p Ψ0 :=
       match XΦ0 with
       | Some (?X, ?Φ0) =>
           let H := fresh "H" in
-          epose proof (H := cstep_congr Φ0 Ψ0 _ X); list_simplifier;
+          pose proof (H := cstep_congr X Φ0 Ψ0); list_simplifier;
           apply H; clear H
       end
   end.
@@ -585,33 +658,114 @@ Ltac rself :=
       rctx □ Φ Ψ
   end.
 
-Ltac rwpol Φ Φ :=
-  let Hins := fresh "H" in
-  let Hdel := fresh "H" in
-  pose proof (Hins := R_pol Φ Φ);
-  pose proof (Hdel := R_co_pol Φ Φ);
-  repeat rewrite fill_hole/= in Hins, Hdel; list_simplifier;
-  (exact Hins || exact Hdel);
-  clear Hins Hdel.
-
-Ltac rwpolm p :=
+Ltac rspol p Φl Φr :=
   match goal with
-  | |- ?n ⋅ ?Φ ++ ?Ψ ⇀ _ =>
-      let spΨ := eval cbn in (bpath p (n ⋅ Ψ)) in
-      match spΨ with
-      | Some (?Φ, _) =>
-          rwpol Φ (n ⋅ Φ)
+  | |- ftob ?ϕ ⇀ _ =>
+      let XΨ := eval cbn in (fpath p ϕ) in
+      match XΨ with
+      | Some (?X, ?Ψ) =>
+          let H := fresh "H" in
+          pose proof (H := R_pol Ψ 0 X);
+          rewrite bshift_zero /= in H;
+          apply H;
+          match X with
+          | Petal _ _ _ ?Y _ =>
+              let H := fresh "H" in
+              epose proof (H := P_self _ Y 0 Φl Φr _ 0 _);
+              list_simplifier; apply H
+          end
+      end
+  end.
+
+Ltac rspolm p Φl Φr :=
+  rstepm (0 :: p) (@nil flower); [>
+    rself;
+    rspol p Φl Φr
+  |].
+
+Ltac rscopol Y Φl Ψ Φr :=
+  let H := fresh "H" in
+  pose proof (H := R_co_pol Ψ 0 Y); list_simplifier;
+  rewrite bshift_zero /= in H;
+  apply H;
+  match Y with
+  | Petal _ _ _ ?Y0 _ =>
+      let H := fresh "H" in
+      epose proof (H := P_self _ Y0 0 Φl Φr _ 0 _); list_simplifier;
+      apply H
+  end.
+
+Ltac rwcopol Y Φl Ψ Φr :=
+  let H := fresh "H" in
+  pose proof (H := R_co_pol Ψ 0 Y); list_simplifier;
+  rewrite bshift_zero /= in H;
+  apply H;
+  match Y with
+  | Planter (_ ++ _ ++ _) ?Y0 _ =>
+      let H := fresh "H" in
+      epose proof (H := P_wind_r _ Y0 Φl Φr _); list_simplifier;
+      apply H
+  | Planter _ ?Y0 (_ ++ _ ++ _) =>
+      let H := fresh "H" in
+      epose proof (H := P_wind_l _ Y0 Φl Φr _); list_simplifier;
+      apply H
+  end.
+
+Ltac rscopolm p i Φl Ψ Φr :=
+  match goal with
+  | |- [?ϕ] ~>* _ =>
+      let XΦ := eval cbn in (fpath p ϕ) in
+      match XΦ with
+      | Some (?X, ?Φ) =>
+          let X0 :=
+            match i with
+            | 0 => constr:(Planter [] □ Φ)
+            | 1 => constr:(Planter Φ □ [])
+            end in
+          let Y := eval cbn in (X ⪡ X0) in
+          let Ψ' := eval cbn in (X0 ⋖ Ψ) in
+          rstepm (0 :: p) Ψ'; [>
+            rself;
+            rscopol Y Φl Ψ Φr
+          |]
+      end
+  end.
+
+Ltac rwcopolm p i Φl Ψ Φr :=
+  match goal with
+  | |- ?Φ1 ++ ?Φ ++ ?Φ2 ~>* _ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          let X0 :=
+            match i with
+            | 0 => constr:(Planter [] □ Φ0)
+            | 1 => constr:(Planter Φ0 □ [])
+            end in
+          let Y := eval cbn in (X ⪡ X0) in
+          let Ψ' := eval cbn in (X0 ⋖ Ψ) in
+          let Φ' := eval cbn in (bset Ψ' p Φ) in
+          match Φ' with
+          | Some ?Φ' =>
+              rstep (Φ1 ++ Φ' ++ Φ2); [>
+                rself;
+                rwcopol (Planter Φ1 Y Φ2) Φl Ψ Φr
+              |]
+          end
       end
   end.
 
 Ltac rrep :=
-  match goal with
-  | |- ?n ⋅ [?m ⋅ (∅ ⊢ ?Ψs) :: ?Φ ⊢ ?Δ] ⇀ _ =>
-      let H := fresh "H" in
-      pose proof (H := R_rep (?m ⋅ Φ) Ψs Δ);
-      repeat rewrite fill_hole/= in H; list_simplifier;
-      exact H; clear H
-  end.
+  eapply rtc_l; [>
+    rself;
+    match goal with
+    | |- [?n ⋅ ?Φl ++ [⊢ ?Ψs] ++ ?Φr ⊢ ?Δ] ⇀ _ =>
+        let H := fresh "H" in
+        pose proof (H := R_rep Ψs n Φl Φr Δ);
+        list_simplifier;
+        eapply H
+    end
+  |].
 
 Ltac rpis :=
   apply R_epis_pis.
