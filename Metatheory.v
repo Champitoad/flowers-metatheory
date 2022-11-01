@@ -510,6 +510,47 @@ Proof.
   by rewrite shift_fshift IH.
 Qed.
 
+Lemma unshift_funshift : forall C n c,
+  unshift n c <$> ⌈C⌉ = ⌈funshift n c C⌉.
+Proof.
+  elim/form_induction =>
+    [|||A B IHA IHB |A B IHA IHB |A B IHA IHB |A IHA |A IHA] n c //=;
+  try repeat rewrite Nat.add_0_r;
+  try rewrite fmap_app;
+  try by rewrite IHA IHB /=.
+  by rewrite IHA.
+  by rewrite IHA.
+Qed.
+
+Lemma bunshift_funshift : forall Γ n c,
+  unshift n c <$> ⌈[Γ]⌉ = ⌈[funshift n c <$> Γ]⌉.
+Proof.
+  elim => [|A Γ IH] n c //.
+  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  by rewrite unshift_funshift IH.
+Qed.
+
+Lemma subst_fsubst : forall C i t,
+  subst i t <$> ⌈C⌉ = ⌈fsubst i t C⌉.
+Proof.
+  elim/form_induction =>
+    [|||A B IHA IHB |A B IHA IHB |A B IHA IHB |A IHA |A IHA] n c //=;
+  try repeat rewrite Nat.add_0_r;
+  try repeat rewrite Terms.tshift_zero;
+  try rewrite fmap_app;
+  try by rewrite IHA IHB //=.
+  by rewrite IHA.
+  by rewrite IHA.
+Qed.
+
+Lemma bsubst_fsubst : forall Γ i t,
+  subst i t <$> ⌈[Γ]⌉ = ⌈[fsubst i t <$> Γ]⌉.
+Proof.
+  elim => [|A Γ IH] n c //.
+  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  by rewrite subst_fsubst IH.
+Qed.
+
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
   (forall A, In A Γ -> ⌈A⌉ ∈ X) ->
@@ -631,7 +672,26 @@ Proof.
 
   (* R∃ *)
   * move => t Γ C Hp1 IH1.
-    admit.
+
+    pose proof (H := R_ipet 0 t 0 ⌈C⌉ ∅ [] []).
+    assert (Hbounds : 0 <= 0 <= 0). { lia. }
+    specialize (H Hbounds).
+    list_simplifier.
+    apply (R_ctx □) in H; simpl in H.
+    apply rtc_once in H.
+    rctxmH [0;1;0] H.
+    rewrite subst_fsubst unshift_funshift.
+
+    rectxmt [0;1;0].
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) [1 ⋅ ⌈C⌉].
+    reflexivity.
+
+    rscopolm [1;0;1;0;0] 0 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rctxmH [0;1;0;1;0] IH1.
+
+    rpetm [0;1;0] (@nil garden) [1 ⋅ ⌈C⌉].
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 
   (* L⊤ *)
   * move => Γ Γ' C Hp1 IH1.
@@ -715,7 +775,39 @@ Proof.
   
   (* L∀ *)
   * move => A t Γ Γ' C Ip1 IH1.
-    admit.
+    rewrite finterp_And bind_app bind_cons /=.
+    rewrite finterp_And bind_app bind_cons /= in IH1.
+
+    epose proof (H := R_ipis 0 t 0 _ [0 ⋅ ⌈A⌉]).
+    assert (Hbounds : 0 <= 0 <= 0). { lia. }
+    specialize (H Hbounds).
+    list_simplifier.
+    apply (R_ctx □) in H; simpl in H.
+    apply rtc_once in H.
+    rectxmt [0;0].
+    pose proof (Hctx := cstep_congr (Planter ⌈[Γ]⌉ □ ⌈[Γ']⌉)); simpl in Hctx.
+    rewrite cons_app. apply Hctx.
+    rctxmH (@nil nat) H. list_simplifier.
+    rewrite subst_fsubst unshift_funshift Terms.tshift_zero.
+    reflexivity.
+
+    change ([?ϕ; ?ψ] ++ ?Φ) with ([ϕ] ++ ψ :: Φ).
+    epose proof (H' := R_epis_pis 0 _ 0 _ _ _).
+    rewrite bshift_zero bshift_zero pshift_zero /= in H'.
+    eapply rtc_l. rself. eapply H'.
+
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
+    rewrite cons_app /ftob.
+    match goal with
+    | |- [_ ⋅ ?Φ1 ++ ?Φ2 ++ ?Φ3 ++ ?Φ4 ⊢ _] ~>* _ =>
+        rscopolm [1;0;0] 0 0 (@nil flower) Φ1 (Φ2 ++ Φ3 ++ Φ4);
+        rscopolm [1;0;0] 1 0 Φ1 Φ2 (Φ3 ++ Φ4);
+        rscopolm [1;0;0] 1 0 (Φ1 ++ Φ2 ++ Φ3) Φ4 (@nil flower)
+    end.
+    rctxmH [0;1;0] IH1.
+
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 
   (* L∃ *)
   * move => A Γ Γ' C Ip1 IH1.
@@ -735,7 +827,7 @@ Proof.
     rctxmH [0;1;0] IH1.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-Admitted.
+Qed.
 
 End Completeness.
 
