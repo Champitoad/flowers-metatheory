@@ -490,6 +490,12 @@ Proof.
   elim => [|A Γ IH] //=. by rewrite IH.
 Qed.
 
+Lemma bshift_fshift : forall Γ n c,
+  shift n c <$> ⌈[Γ]⌉ = ⌈[fshift n c <$> Γ]⌉.
+Proof.
+  elim =>//.
+Admitted.
+
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
   (forall A, In A Γ -> ⌈A⌉ ∈ X) ->
@@ -550,8 +556,8 @@ Proof.
     rcoepispet 0 0 (@nil flower) ⌈B⌉ (@nil garden) (@nil garden).
     rcoepispet 0 0 [⊢ [0 ⋅ ⌈A⌉]] (@nil flower) (@nil garden) (@nil garden).
 
-    rscopolm [1;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
-    rscopolm [1;1;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;0;0] 0 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;1;0] 0 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
 
     rctxmH [0;1;0] IH1.
     rctxmH [0;1;0] IH2.
@@ -566,7 +572,7 @@ Proof.
     rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) [0 ⋅ ⌈B⌉].
     reflexivity.
 
-    rscopolm [1;0;1;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;0;1;0;0] 0 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;1;0] IH1.
     rpetm [0;1] (@nil garden) [0 ⋅ ⌈B⌉].
     rpetm (@nil nat) (@nil garden) (@nil garden).
@@ -579,7 +585,7 @@ Proof.
     rcoepispet 0 0 (@nil flower) (@nil flower) [0 ⋅ ⌈A⌉] (@nil garden).
     reflexivity.
 
-    rscopolm [1;0;2;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;0;2;0;0] 0 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;2;0] IH1.
     rpetm [0;1] [0 ⋅ ⌈A⌉] (@nil garden).
     rpetm (@nil nat) (@nil garden) (@nil garden).
@@ -588,7 +594,7 @@ Proof.
   (* R⊃ *)
   * move => A B Γ Hp1 IH1.
 
-    rscopolm [1;0;0] 1 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rscopolm [1;0;0] 1 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
 
     rctxmH [0;1;0] IH1.
     rpetm (@nil nat) (@nil garden) (@nil garden).
@@ -601,9 +607,13 @@ Proof.
     rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
     reflexivity.
 
-    (* rscopolm  *)
+    rscopolm [1;0;1;0;0] 0 1 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
+    rewrite {2}finterp_And bshift_fshift -finterp_And.
+    rctxmH [0;1;0;1] IH1.
 
-    admit.
+    rpetm [0;1] (@nil garden) (@nil garden).
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 
   (* R∃ *)
   * move => t Γ C Hp1 IH1.
@@ -643,10 +653,10 @@ Proof.
     rewrite bshift_zero.
 
     rewrite /ftob.
-    rscopolm [1;0;0] 0 (@nil flower) ⌈[Γ]⌉ ⌈[Γ']⌉.
-    rscopolm [1;0;0] 1 ⌈[Γ]⌉ ⌈[Γ']⌉ (@nil flower).
-    rscopolm [1;1;0] 0 (@nil flower) ⌈[Γ]⌉ ⌈[Γ']⌉.
-    rscopolm [1;1;0] 1 ⌈[Γ]⌉ ⌈[Γ']⌉ (@nil flower).
+    rscopolm [1;0;0] 0 0 (@nil flower) ⌈[Γ]⌉ ⌈[Γ']⌉.
+    rscopolm [1;0;0] 1 0 ⌈[Γ]⌉ ⌈[Γ']⌉ (@nil flower).
+    rscopolm [1;1;0] 0 0 (@nil flower) ⌈[Γ]⌉ ⌈[Γ']⌉.
+    rscopolm [1;1;0] 1 0 ⌈[Γ]⌉ ⌈[Γ']⌉ (@nil flower).
 
     rctxmH [0;1;0] IH1.
     rctxmH [0;1;0] IH2.
@@ -715,15 +725,10 @@ Proof.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
-  * rstep (0 ⋅ Φ ⊢ [0 ⋅ [⊢ [0 ⋅ Ψ]]]). rself.
-    epose proof (Hp := R_co_epis_pet 0 _ 0 [] [] _ [] []); list_simplifier.
-    eapply Hp.
+  * rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
 
-    unfold ftob in *.
-    rscopolm [1;0;0] 0 (@nil flower) Φ (@nil flower).
-    rstepm [0;1] (⊢ [0 ⋅ [0 ⋅ Φ ⊢ [0 ⋅ Ψ]]]). rself.
-    epose proof (Hp := R_co_epis_pet 0 _ 0 [] [] _ [] []); list_simplifier.
-    eapply Hp.
+    rscopolm [1;0;0] 0 0 (@nil flower) Φ (@nil flower).
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
 
     rctxmH [0;1;0] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).

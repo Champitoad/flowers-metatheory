@@ -692,16 +692,18 @@ Ltac rspolm p Φl Φr :=
     rspol p Φl Φr
   |].
 
-Ltac rscopol Y Φl Ψ Φr :=
+Ltac rscopol Y n Φl Ψ Φr :=
   let H := fresh "H" in
-  pose proof (H := R_co_pol Ψ 0 Y); list_simplifier;
-  rewrite bshift_zero /= in H;
+  pose proof (H := R_co_pol Ψ n Y); list_simplifier;
+  repeat rewrite bshift_zero/= in H;
+  repeat rewrite bshift_zero/=;
   apply H;
   match Y with
   | Petal _ _ _ ?Y0 _ =>
       let H := fresh "H" in
       epose proof (H := P_self _ Y0 0 Φl Φr _ 0 _); list_simplifier;
-      apply H
+      repeat rewrite bshift_zero/= in H;
+      eapply H
   end.
 
 Ltac rwcopol Y Φl Ψ Φr :=
@@ -720,7 +722,7 @@ Ltac rwcopol Y Φl Ψ Φr :=
       apply H
   end.
 
-Ltac rscopolm p i Φl Ψ Φr :=
+Ltac rscopolm p i n Φl Ψ Φr :=
   rewrite /ftob;
   match goal with
   | |- [?ϕ] ~>* _ =>
@@ -733,11 +735,11 @@ Ltac rscopolm p i Φl Ψ Φr :=
             | 1 => constr:(Planter Φ □ [])
             end in
           let Y := eval cbn in (X ⪡ X0) in
-          let Ψ' := eval cbn in (X0 ⋖ Ψ) in
+          let Ψ' := eval cbn in (X0 ⋖ (shift n 0 <$> Ψ)) in
           rstepm (0 :: p) Ψ'; [>
             rself;
-            rscopol Y Φl Ψ Φr
-          |]
+            rscopol Y n Φl Ψ Φr
+          | repeat rewrite bshift_zero/=]
       end
   end.
 
