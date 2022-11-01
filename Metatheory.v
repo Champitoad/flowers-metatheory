@@ -547,15 +547,8 @@ Proof.
   (* R∧ *)
   * move => A B Γ Hp1 IH1 Hp2 IH2.
 
-    rstepm_app [0;1] 0 ([⊢ [0 ⋅ ⌈A⌉]]).
-    pose proof (H := R_co_epis_pet 0 ⌈A⌉ 0 [] ⌈B⌉ (0 ⋅ ⌈⋀ Γ⌉) [] []).
-    list_simplifier; rewrite bshift_zero in H.
-    rself. apply H.
-
-    rstepm_app [0;1] 1 ([⊢ [0 ⋅ ⌈B⌉]]).
-    pose proof (H := R_co_epis_pet 0 ⌈B⌉ 0 [⊢ [0 ⋅ ⌈A⌉]] [] (0 ⋅ ⌈⋀ Γ⌉) [] []).
-    list_simplifier; rewrite bshift_zero in H.
-    rself; apply H.
+    rcoepispet 0 0 (@nil flower) ⌈B⌉ (@nil garden) (@nil garden).
+    rcoepispet 0 0 [⊢ [0 ⋅ ⌈A⌉]] (@nil flower) (@nil garden) (@nil garden).
 
     rscopolm [1;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rscopolm [1;1;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
@@ -569,10 +562,9 @@ Proof.
   (* R∨₁ *)
   * move => A B Γ Hp1 IH1.
 
-    rstepm [0;1;0;1] (⊢ [0 ⋅ ⌈A⌉]).
-    rctxm [0;1].
-    epose proof (H := R_co_epis_pet 0 _ 0 [] [] _ [] [0 ⋅ ⌈B⌉]);
-    list_simplifier; apply H.
+    rectxmt [0;1].
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) [0 ⋅ ⌈B⌉].
+    reflexivity.
 
     rscopolm [1;0;1;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;1;0] IH1.
@@ -583,10 +575,9 @@ Proof.
   (* R∨₂ *)
   * move => A B Γ Hp1 IH1.
 
-    rstepm [0;1;0;2] (⊢ [0 ⋅ ⌈B⌉]).
-    rctxm [0;1].
-    epose proof (H := R_co_epis_pet 0 _ 0 [] [] _ [0 ⋅ ⌈A⌉] []);
-    list_simplifier; apply H.
+    rectxmt [0;1].
+    rcoepispet 0 0 (@nil flower) (@nil flower) [0 ⋅ ⌈A⌉] (@nil garden).
+    reflexivity.
 
     rscopolm [1;0;2;0;0] 0 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
     rctxmH [0;1;0;2;0] IH1.
@@ -597,7 +588,6 @@ Proof.
   (* R⊃ *)
   * move => A B Γ Hp1 IH1.
 
-    rewrite /ftob.
     rscopolm [1;0;0] 1 (@nil flower) ⌈⋀ Γ⌉ (@nil flower).
 
     rctxmH [0;1;0] IH1.
@@ -606,6 +596,13 @@ Proof.
 
   (* R∀ *)
   * move => Γ C Hp1 IH1.
+
+    rectxmt [0;1;0].
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
+    reflexivity.
+
+    (* rscopolm  *)
+
     admit.
 
   (* R∃ *)
@@ -666,10 +663,8 @@ Proof.
     rctransm [0;0] (⌈[Γ]⌉ ++ (0 ⋅ [⊢ [0 ⋅ ⌈A⌉]] ⊢ [0 ⋅ ⌈B⌉]) :: ⌈[Γ']⌉).
     rctxt_app (@nil nat) 1.
     rctxt_app (@nil nat) 0.
-    apply rtc_once. rself.
-    epose proof (H := R_co_epis_pis 0 _ 0 [] [] _).
-    rewrite pshift_zero /= in H. list_simplifier.
-    eapply H.
+    rcoepispis 0 0 (@nil flower) (@nil flower).
+    reflexivity.
 
     rctransm [0;0] (⌈[Γ]⌉ ++ (0 ⋅ [0 ⋅ ⌈[Γ]⌉ ⊢ [0 ⋅ ⌈A⌉]] ⊢ [0 ⋅ ⌈B⌉]) :: ⌈[Γ']⌉).
     do 2 rewrite [_ :: ⌈[Γ']⌉]cons_app.
@@ -691,10 +686,8 @@ Proof.
     rctxmH [0;0] IH1. reflexivity.
 
     etransitivity; [> |eapply IH2].
-    apply rtc_once. rself.
-    epose proof (H := R_epis_pis 0 _ 0 ⌈[Γ]⌉ ⌈[Γ']⌉ _).
-    rewrite bshift_zero bshift_zero pshift_zero /= in H. list_simplifier.
-    eapply H.
+    repispis 0 0 ⌈[Γ]⌉ ⌈[Γ']⌉.
+    reflexivity.
   
   (* L∀ *)
   * move => A t Γ Γ' C Ip1 IH1.

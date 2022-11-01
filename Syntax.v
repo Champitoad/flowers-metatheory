@@ -508,12 +508,6 @@ Ltac rtransm p Ψ :=
       end
   end.
 
-Lemma fill_hole Ψ :
-  □ ⋖ Ψ = Ψ.
-Proof.
-  reflexivity.
-Qed.
-
 Ltac rctx X Φ Ψ :=
   apply (R_ctx X Φ Ψ).
 
@@ -636,13 +630,28 @@ Ltac rctransm p Ψ0 :=
 
 Ltac rctxmt p Ψ0 :=
   match goal with
-  | |- ?Φ ~>* ?Ψ =>
+  | |- ?Φ ~>* _ =>
       let XΦ0 := eval cbn in (bpath p Φ) in
       match XΦ0 with
       | Some (?X, ?Φ0) =>
           let H := fresh "H" in
           pose proof (H := cstep_congr X Φ0 Ψ0); list_simplifier;
           apply H; clear H
+      end
+  end.
+
+Ltac rectxmt p :=
+  rewrite /ftob;
+  match goal with
+  | |- ?Φ ~>* _ =>
+      let XΦ0 := eval cbn in (bpath p Φ) in
+      match XΦ0 with
+      | Some (?X, ?Φ0) =>
+          let H := fresh "H" in
+          etransitivity; [>
+            epose proof (H := cstep_congr X Φ0 _); list_simplifier;
+            eapply H; clear H
+          |]
       end
   end.
 
@@ -712,6 +721,7 @@ Ltac rwcopol Y Φl Ψ Φr :=
   end.
 
 Ltac rscopolm p i Φl Ψ Φr :=
+  rewrite /ftob;
   match goal with
   | |- [?ϕ] ~>* _ =>
       let XΦ := eval cbn in (fpath p ϕ) in
@@ -755,6 +765,56 @@ Ltac rwcopolm p i Φl Ψ Φr :=
       end
   end.
 
+Ltac rcoepispet n m Φl Φr Δl Δr :=
+  rewrite /ftob;
+  match goal with
+  | |- [?γ ⊢ _] ~>* _ =>
+      let H := fresh "H" in
+      epose proof (H := R_co_epis_pet m _ n Φl Φr γ Δl Δr);
+      list_simplifier;
+      repeat rewrite bshift_zero in H;
+      etransitivity; [> eapply rtc_once; rself; eapply H |];
+      clear H
+  end.
+
+Ltac repispet n m Φl Φr Δl Δr :=
+  rewrite /ftob;
+  match goal with
+  | |- [?γ ⊢ _] ~>* _ =>
+      let H := fresh "H" in
+      epose proof (H := R_epis_pet m _ n Φl Φr γ Δl Δr);
+      list_simplifier;
+      repeat rewrite bshift_zero in H;
+      etransitivity; [> eapply rtc_once; rself; eapply H |];
+      clear H
+  end.
+
+Ltac rcoepispis n m Φl Φr :=
+  rewrite /ftob;
+  match goal with
+  | |- [_ ⊢ ?Δ] ~>* _ =>
+      let H := fresh "H" in
+      epose proof (H := R_co_epis_pis m _ n Φl Φr Δ);
+      list_simplifier;
+      repeat rewrite bshift_zero in H;
+      repeat rewrite pshift_zero in H;
+      etransitivity; [> eapply rtc_once; rself; eapply H |];
+      clear H
+  end.
+
+Ltac repispis n m Φl Φr :=
+  rewrite /ftob;
+  match goal with
+  | |- [_ ⊢ ?Δ] ~>* _ =>
+      let H := fresh "H" in
+      epose proof (H := R_epis_pis m _ n Φl Φr Δ);
+      list_simplifier;
+      repeat rewrite bshift_zero in H;
+      repeat rewrite pshift_zero in H;
+      etransitivity; [> eapply rtc_once; rself; eapply H |];
+      clear H
+  end.
+
 Ltac rrep :=
   eapply rtc_l; [>
     rself;
@@ -766,24 +826,6 @@ Ltac rrep :=
         eapply H
     end
   |].
-
-Ltac rpis :=
-  apply R_epis_pis.
-
-Ltac rcopis :=
-  apply R_co_epis_pis.
-
-Ltac rpism p :=
-  match sub_at p with
-  | Some ((⊢ [?Ψ])) =>
-      rcstepm p Ψ; [> rpis |]
-  end.
-
-Ltac rcopism p :=
-  match sub_at p with
-  | Some ?Ψ => 
-      rcstepm p (0 ⋅ [⊢ [Ψ]]); [> rcopis |]
-  end.
 
 Ltac rpet Δ Δ' :=
   apply (R_pet _ Δ Δ').
