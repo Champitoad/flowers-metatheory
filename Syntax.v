@@ -701,7 +701,7 @@ Ltac rscopol Y n Φl Ψ Φr :=
   match Y with
   | Petal _ _ _ ?Y0 _ =>
       let H := fresh "H" in
-      epose proof (H := P_self _ Y0 0 Φl Φr _ 0 _); list_simplifier;
+      epose proof (H := P_self _ Y0 _ Φl Φr _ 0 _); list_simplifier;
       repeat rewrite bshift_zero/= in H;
       eapply H
   end.

@@ -490,11 +490,25 @@ Proof.
   elim => [|A Γ IH] //=. by rewrite IH.
 Qed.
 
+Lemma shift_fshift : forall C n c,
+  shift n c <$> ⌈C⌉ = ⌈fshift n c C⌉.
+Proof.
+  elim/form_induction =>
+    [|||A B IHA IHB |A B IHA IHB |A B IHA IHB |A IHA |A IHA] n c //=;
+  try repeat rewrite Nat.add_0_r;
+  try rewrite fmap_app;
+  try by rewrite IHA IHB /=.
+  by rewrite IHA.
+  by rewrite IHA.
+Qed.
+
 Lemma bshift_fshift : forall Γ n c,
   shift n c <$> ⌈[Γ]⌉ = ⌈[fshift n c <$> Γ]⌉.
 Proof.
-  elim =>//.
-Admitted.
+  elim => [|A Γ IH] n c //.
+  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  by rewrite shift_fshift IH.
+Qed.
 
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
@@ -617,7 +631,7 @@ Proof.
 
   (* R∃ *)
   * move => t Γ C Hp1 IH1.
-    admit. 
+    admit.
 
   (* L⊤ *)
   * move => Γ Γ' C Hp1 IH1.
@@ -705,7 +719,22 @@ Proof.
 
   (* L∃ *)
   * move => A Γ Γ' C Ip1 IH1.
-    admit.
+    rewrite finterp_And bind_app bind_cons /=.
+    rewrite finterp_And bind_app bind_cons /= in IH1.
+
+    repispis 0 1 ⌈[Γ]⌉ ⌈[Γ']⌉.
+
+    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
+
+    rscopolm [1;0;0] 0 0 ((shift 1 0 <$> ⌈[Γ]⌉) ++ ⌈A⌉) (shift 1 0 <$> ⌈[Γ']⌉) (@nil flower).
+    rscopolm [1;0;0] 0 0 (shift 1 0 <$> ⌈[Γ]⌉) ⌈A⌉ (shift 1 0 <$> ⌈[Γ']⌉).
+    rscopolm [1;0;0] 0 0 (@nil flower) (shift 1 0 <$> ⌈[Γ]⌉) (⌈A⌉ ++ (shift 1 0 <$> ⌈[Γ']⌉)).
+
+    repeat rewrite bshift_fshift.
+    rewrite shift_fshift.
+    rctxmH [0;1;0] IH1.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 Admitted.
 
 End Completeness.
