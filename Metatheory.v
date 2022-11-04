@@ -551,10 +551,101 @@ Proof.
   by rewrite subst_fsubst IH.
 Qed.
 
+Lemma bv_comp : ∀ X Y,
+  bv (X ⪡ Y) = bv X + bv Y.
+Proof.
+  elim =>//=; intros; rewrite H. lia.
+  destruct γ. lia.
+Qed.
+
+Lemma bv_comp_pollin_self {Y Ψ k n Φ Δ m X Δ'} :
+  let Z := Petal (n ⋅ Φ) Δ m X Δ' in
+  Ψ ≺ k in Z ->
+  bv (Y ⪡ Z) = bv Y + n + k.
+Proof.
+  move => Z H. inv H.
+  by rewrite bv_comp /=; lia.
+Qed.
+
+Lemma bv_comp_pollin_wind {Y Ψ k Φ X Φ'} :
+  let Z := Planter Φ X Φ' in
+  Ψ ≺ k in Z ->
+  bv (Y ⪡ Z) = bv Y + k.
+Proof.
+  move => Z H. inv H;
+  by rewrite bv_comp /=; lia.
+Qed.
+
+Ltac solve_elem_of_list :=
+  match goal with
+  | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list
+  | |- ?x ∈ ?x :: ?l => apply elem_of_list_here
+  | H : ?x = ?y |- ?x ∈ ?y :: ?l => rewrite H; apply elem_of_list_here
+  | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
+  | |- ?x ∈ ?l => by auto
+  end.
+
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
-  (forall A, In A Γ -> ⌈A⌉ ∈ X) ->
-  X ⋖ ⌈C⌉ ~>* X ⋖ [].
+  (forall D, D ∈ Γ -> ⌈D⌉ ∈! X) ->
+  X ⋖! ⌈C⌉ ~>* X ⋖ [].
+Proof.
+  elim =>/= {Γ C} [
+    A Γ Γ'
+  | A Γ Γ' Γ'' C Hp1 IH1
+  | A Γ Γ' Γ'' C Hp1 IH1
+  | Γ
+  | A B Γ Hp1 IH1 Hp2 IH2
+  | A B Γ Hp1 IH1
+  | A B Γ Hp1 IH1
+  | A B Γ Hp1 IH1
+  | Γ C Hp1 IH1
+  | t Γ C Hp1 IH1
+  | Γ Γ' C Hp1 IH1
+  | Γ Γ' C
+  | A B Γ Γ' C Hp1 IH1
+  | A B Γ Γ' C Hp1 IH1 Hp2 IH2
+  | A B Γ Γ' C Hp1 IH1 Hp2 IH2
+  | A t Γ Γ' C Hp1 IH1
+  | A t Γ Γ' C IH1
+  ] X H.
+
+  (* Axiom *)
+  * assert (Hprem : A ∈ (Γ ++ A :: Γ')).
+    { solve_elem_of_list. }
+    elim (H A Hprem) => [X0 k n Φ Δ m Z Δ' |X0 k Φ Z Φ'] Y Hpol;
+    rewrite /fill_ca -fill_comp -fill_comp;
+    apply cstep_congr.
+    - epose proof (Hbv := bv_comp_pollin_self Hpol).
+      erewrite Hbv.
+      epose proof (Hp := R_pol _ _ _ Hpol).
+      rewrite -bshift_add Nat.add_comm in Hp.
+      apply rtc_once. rself.
+      exact Hp.
+    - epose proof (Hbv := bv_comp_pollin_wind Hpol).
+      erewrite Hbv.
+      epose proof (Hp := R_pol _ _ _ Hpol).
+      rewrite -bshift_add Nat.add_comm in Hp.
+      apply rtc_once. rself.
+      exact Hp.
+
+  (* Right contraction *)
+  * apply IH1. intros. apply H.
+    decompose_elem_of_list; solve_elem_of_list.
+
+  (* Left contraction *)
+  * apply IH1. intros. apply H.
+    decompose_elem_of_list; solve_elem_of_list.
+
+  (* R⊤ *)
+  * reflexivity.
+
+  (* R∧ *)
+  * specialize (IH1 (X ⪡ Planter [] □ ⌈B⌉)).
+    rewrite /fill_ca in IH1.
+    repeat rewrite -fill_comp in IH1.
+    rewrite /= in IH1.
+
 Admitted.
 
 Theorem completeness Γ C :

@@ -252,10 +252,11 @@ Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
   end
 where "X ⋖ Ψ" := (fill Ψ X).
 
-Definition fillac Ψ X :=
+(* Capture-avoiding *)
+Definition fill_ca Ψ X :=
   X ⋖ (shift (bv X) 0 <$> Ψ).
 
-Notation "X ⋖! Ψ" := (fillac Ψ X) (at level 15).
+Notation "X ⋖! Ψ" := (fill_ca Ψ X) (at level 15).
 
 Reserved Infix "⪡" (at level 15).
 
@@ -362,9 +363,23 @@ Inductive pollin : bouquet -> nat -> ctx -> Prop :=
 where "Ψ ≺ n 'in' X" := (pollin Ψ n X).
 
 Definition assum (Ψ : bouquet) (X : ctx) :=
-  ∃ X0 n X1, Ψ ≺ n in X1 /\ X = X0 ⪡ X1.
+  ∃ n Y Z, Ψ ≺ n in Z /\ X = Y ⪡ Z.
 
-Notation "Ψ ∈ X" := (assum Ψ X).
+Reserved Notation "Ψ ∈! X" (at level 30).
+
+(* Capture-avoiding *)
+Inductive assum_ca Ψ : ctx -> Prop :=
+| A_self X k n Φ Δ m Z Δ' :
+  let Y := Petal (n ⋅ Φ) Δ m Z Δ' in
+  shift (bv X + n) 0 <$> Ψ ≺ k in Y ->
+  Ψ ∈! X ⪡ Y
+| A_wind X k Φ Z Φ' :
+  let Y := Planter Φ Z Φ' in
+  shift (bv X) 0 <$> Ψ ≺ k in Y ->
+  Ψ ∈! X ⪡ Y
+where "Ψ ∈! X" := (assum_ca Ψ X).
+
+(* Notation "Ψ ∈ X" := (assum Ψ X). *)
 
 (** ** Local rules *)
 

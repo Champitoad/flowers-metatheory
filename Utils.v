@@ -13,6 +13,7 @@ Coercion string_to_name : string >-> name.
 Ltac done := try ssreflect.done; solve [auto].
 
 Ltac inv H := inversion H; subst; clear H; try congruence.
+Ltac inve H := inversion H; subst; try congruence.
 Ltac econs := econstructor; eauto; try congruence.
 
 Ltac solve_decide := try ((left + right); congruence).
