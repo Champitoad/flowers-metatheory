@@ -65,6 +65,15 @@ Qed.
 
 (** * Lists *)
 
+Ltac solve_elem_of_list :=
+  match goal with
+  | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list
+  | |- ?x ∈ ?x :: ?l => apply elem_of_list_here
+  | H : ?x = ?y |- ?x ∈ ?y :: ?l => rewrite H; apply elem_of_list_here
+  | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
+  | |- ?x ∈ ?l => by auto
+  end.
+
 Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
   (∀ x, In x l -> P x) <-> Forall P l.
 Proof.

@@ -269,11 +269,25 @@ Fixpoint comp (X : ctx) (Y : ctx) : ctx :=
   end
 where "X ⪡ Y" := (comp X Y).
 
+Lemma comp_assoc : ∀ X Y Z,
+  (X ⪡ Y) ⪡ Z = X ⪡ (Y ⪡ Z).
+Proof.
+  elim => [|Φ X IHX Φ' |n X IHX Δ |γ Δ n X IHX Δ'] Y Z //=;
+  by rewrite IHX.
+Qed.
+
 Lemma fill_comp : ∀ X Y Φ,
   X ⋖ (Y ⋖ Φ) = (X ⪡ Y) ⋖ Φ.
 Proof.
   elim => [|Φl X IH Φr |n X IH Δ |γ Δ n X IH Δ'] Y Φ //=;
   by rewrite IH.
+Qed.
+
+Lemma bv_comp : ∀ X Y,
+  bv (X ⪡ Y) = bv X + bv Y.
+Proof.
+  elim =>//=; intros; rewrite H. lia.
+  destruct γ. lia.
 Qed.
 
 (** ** Path operations *)
@@ -351,6 +365,8 @@ Close Scope string_scope.
 
 (** * Rules *)
 
+(** ** Pollination predicate *)
+
 Reserved Notation "Ψ ≺ n 'in' X" (at level 80).
 
 Inductive pollin : bouquet -> nat -> ctx -> Prop :=
@@ -362,8 +378,29 @@ Inductive pollin : bouquet -> nat -> ctx -> Prop :=
   Ψ ≺ (bv X) in (Planter (Φ ++ Ψ ++ Φ') X Φ'')
 where "Ψ ≺ n 'in' X" := (pollin Ψ n X).
 
-Definition assum (Ψ : bouquet) (X : ctx) :=
-  ∃ n Y Z, Ψ ≺ n in Z /\ X = Y ⪡ Z.
+Lemma bv_comp_pollin_self {Y Ψ k n Φ Δ m X Δ'} :
+  let Z := Petal (n ⋅ Φ) Δ m X Δ' in
+  Ψ ≺ k in Z ->
+  bv (Y ⪡ Z) = bv Y + n + k.
+Proof.
+  move => Z H. inv H.
+  by rewrite bv_comp /=; lia.
+Qed.
+
+Lemma bv_comp_pollin_wind {Y Ψ k Φ X Φ'} :
+  let Z := Planter Φ X Φ' in
+  Ψ ≺ k in Z ->
+  bv (Y ⪡ Z) = bv Y + k.
+Proof.
+  move => Z H. inv H;
+  by rewrite bv_comp /=; lia.
+Qed.
+
+(** ** Assumptions *)
+
+(* Definition assum (Ψ : bouquet) (X : ctx) :=
+  ∃ n Y Z, Ψ ≺ n in Z /\ X = Y ⪡ Z. *)
+(* Notation "Ψ ∈ X" := (assum Ψ X). *)
 
 Reserved Notation "Ψ ∈! X" (at level 30).
 
@@ -379,7 +416,27 @@ Inductive assum_ca Ψ : ctx -> Prop :=
   Ψ ∈! X ⪡ Y
 where "Ψ ∈! X" := (assum_ca Ψ X).
 
-(* Notation "Ψ ∈ X" := (assum Ψ X). *)
+Lemma assum_ca_comp_out Ψ X Y :
+  Ψ ∈! X ->
+  Ψ ∈! X ⪡ Y.
+Proof.
+  elim => {X}; intros; rewrite comp_assoc.
+  * apply (A_self _ _ (k + bv Y) _ _ _ _ (Z ⪡ Y)).
+    inve H. rewrite -Nat.add_assoc -bv_comp. econs.
+  * apply (A_wind _ _ (k + bv Y) _ (Z ⪡ Y)).
+    inve H; rewrite -bv_comp; econs.
+Qed.
+
+Lemma assum_ca_comp_in Ψ X Y :
+  (shift (bv X) 0 <$> Ψ) ∈! Y ->
+  Ψ ∈! X ⪡ Y.
+Proof.
+  elim => {Y}; intros; rewrite -comp_assoc.
+  * apply (A_self _ (X ⪡ X0) k).
+    inve H. rewrite -bshift_add bv_comp -Nat.add_assoc Nat.add_comm. econs.
+  * apply (A_wind _ (X ⪡ X0) k).
+    inve H; rewrite -bshift_add bv_comp Nat.add_comm; econs.
+Qed.
 
 (** ** Local rules *)
 

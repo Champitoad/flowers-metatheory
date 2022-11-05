@@ -551,40 +551,6 @@ Proof.
   by rewrite subst_fsubst IH.
 Qed.
 
-Lemma bv_comp : ∀ X Y,
-  bv (X ⪡ Y) = bv X + bv Y.
-Proof.
-  elim =>//=; intros; rewrite H. lia.
-  destruct γ. lia.
-Qed.
-
-Lemma bv_comp_pollin_self {Y Ψ k n Φ Δ m X Δ'} :
-  let Z := Petal (n ⋅ Φ) Δ m X Δ' in
-  Ψ ≺ k in Z ->
-  bv (Y ⪡ Z) = bv Y + n + k.
-Proof.
-  move => Z H. inv H.
-  by rewrite bv_comp /=; lia.
-Qed.
-
-Lemma bv_comp_pollin_wind {Y Ψ k Φ X Φ'} :
-  let Z := Planter Φ X Φ' in
-  Ψ ≺ k in Z ->
-  bv (Y ⪡ Z) = bv Y + k.
-Proof.
-  move => Z H. inv H;
-  by rewrite bv_comp /=; lia.
-Qed.
-
-Ltac solve_elem_of_list :=
-  match goal with
-  | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list
-  | |- ?x ∈ ?x :: ?l => apply elem_of_list_here
-  | H : ?x = ?y |- ?x ∈ ?y :: ?l => rewrite H; apply elem_of_list_here
-  | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
-  | |- ?x ∈ ?l => by auto
-  end.
-
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
   (forall D, D ∈ Γ -> ⌈D⌉ ∈! X) ->
@@ -641,11 +607,55 @@ Proof.
   * reflexivity.
 
   (* R∧ *)
-  * specialize (IH1 (X ⪡ Planter [] □ ⌈B⌉)).
-    rewrite /fill_ca in IH1.
+  * specialize (IH1 (X ⪡ Planter [] □ (shift (bv X) 0 <$> ⌈B⌉))).
+    rewrite /fill_ca in IH1 |- *.
     repeat rewrite -fill_comp in IH1.
-    rewrite /= in IH1.
+    rewrite bv_comp /= Nat.add_0_r in IH1.
+    rewrite fmap_app.
+    etransitivity; [> apply IH1 |].
+    - move => D HD. by apply assum_ca_comp_out.
+    - by apply IH2.
 
+  (* R∨₁ *)
+  * specialize (IH1 (X ⪡ Petal ∅ [] 0 □ [0 ⋅ shift (bv X) 0 <$> ⌈B⌉])).
+    rewrite /fill_ca in IH1 |- *.
+    repeat rewrite -fill_comp in IH1.
+    rewrite bv_comp /= Nat.add_0_r in IH1.
+    rewrite fmap_singl.
+    etransitivity; [> apply IH1 |].
+    - move => D HD. by apply assum_ca_comp_out.
+    - apply cstep_congr.
+      rpetm (@nil nat) (@nil garden) [0 ⋅ shift (bv X) 0 <$> ⌈B⌉].
+      reflexivity.
+
+  (* R∨₁ *)
+  * specialize (IH1 (X ⪡ Petal ∅ [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] 0 □ [])).
+    rewrite /fill_ca in IH1 |- *.
+    repeat rewrite -fill_comp in IH1.
+    rewrite bv_comp /= Nat.add_0_r in IH1.
+    rewrite fmap_singl.
+    etransitivity; [> apply IH1 |].
+    - move => D HD. by apply assum_ca_comp_out.
+    - apply cstep_congr.
+      rpetm (@nil nat) [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] (@nil garden).
+      reflexivity.
+
+  (* R⊃ *) 
+  * specialize (IH1 (X ⪡ Petal (0 ⋅ shift (bv X) 0 <$> ⌈A⌉) [] 0 □ [])).
+    rewrite /fill_ca in IH1 |- *.
+    repeat rewrite -fill_comp in IH1.
+    rewrite bv_comp /= Nat.add_0_r in IH1.
+    rewrite fmap_singl /=.
+    etransitivity; [> apply IH1 |].
+    - move => D HD. decompose_elem_of_list.
+      + subst. apply (A_self _ _ 0).
+        rewrite Nat.add_0_r.
+        epose proof (Hpol := P_self _ □ _ [] [] _ 0 _).
+        list_simplifier. eapply Hpol.
+      + by apply assum_ca_comp_out.
+    - apply cstep_congr.
+      rpetm (@nil nat) (@nil garden) (@nil garden).
+      reflexivity.
 Admitted.
 
 Theorem completeness Γ C :
