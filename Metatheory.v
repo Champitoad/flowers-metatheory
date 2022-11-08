@@ -708,6 +708,11 @@ Proof.
       pose proof (Hass := nassum_comp_out _ _ X X0 Hassum).
       rewrite HE2 -shift_fshift.
       by rewrite /= in Hass.
+    - apply cstep_congr.
+      rpetm (@nil nat) (@nil garden) (@nil garden).
+      reflexivity.
+
+  *
 Admitted.
 
 Theorem completeness Γ C :
