@@ -74,6 +74,22 @@ Ltac solve_elem_of_list :=
   | |- ?x ∈ ?l => by auto
   end.
 
+Lemma elem_of_map {A B : Type} (f : A -> B) (l : list A) (y : B) :
+  y ∈ f <$> l <->
+  exists x, x ∈ l /\ y = f x.
+Proof.
+  elim: l => [|a l IHl]; split; move => H.
+  * inv H.
+  * case: H => [? [H _]]. inv H.
+  * inv H. exists a. split; econs.
+    apply IHl in H2. case: H2 => [x [H1 H2]].
+    exists x. split; auto. econs.
+  * case: H => [x [H1 H2]]. subst.
+    inve H1; rewrite fmap_cons.
+    econs. econs. apply IHl.
+    exists x. split; auto.
+Qed.
+
 Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
   (∀ x, In x l -> P x) <-> Forall P l.
 Proof.

@@ -551,10 +551,45 @@ Proof.
   by rewrite subst_fsubst IH.
 Qed.
 
+(* Definition dummin := 0.
+
+Definition lmin (l : list nat) : nat :=
+  match l with
+  | [] => dummin
+  | n :: l => foldr Nat.min n l
+  end.
+
+Fixpoint tminvar (c : nat) (t : Terms.term) : nat :=
+  match t with
+  | Terms.TVar n => if c <? n then n else dummin
+  | Terms.TFun _ args => lmin (tminvar c <$> args)
+  end.
+
+Fixpoint fminvar (c : nat) (A : form) : nat :=
+  match A with
+  | FAtom p args => lmin (tminvar c <$> args)
+  | FTrue => dummin
+  | FFalse => dummin
+  | FAnd A B => lmin [fminvar c A; fminvar c B]
+  | FOr A B => lmin [fminvar c A; fminvar c B]
+  | FImp A B => lmin [fminvar c A; fminvar c B]
+  | FForall A => fminvar (c + 1) A
+  | FExists A => fminvar (c + 1) A
+  end. *)
+
+Definition is_shifted (n : nat) (A : form) : Prop :=
+  exists B, A = fshift n 0 B.
+
+Lemma is_shifted_zero A :
+  is_shifted 0 A.
+Proof.
+  exists A. by rewrite fshift_zero.
+Qed.
+
 Theorem full_completeness Γ C :
   Γ c⟹ C -> forall X,
-  (forall D, D ∈ Γ -> ⌈D⌉ ∈! X) ->
-  X ⋖! ⌈C⌉ ~>* X ⋖ [].
+  (forall D, D ∈ Γ -> exists n, is_shifted n D /\ nassum n ⌈D⌉ X) ->
+  X ⋖ ⌈C⌉ ~>* X ⋖ [].
 Proof.
   elim =>/= {Γ C} [
     A Γ Γ'
@@ -579,21 +614,13 @@ Proof.
   (* Axiom *)
   * assert (Hprem : A ∈ (Γ ++ A :: Γ')).
     { solve_elem_of_list. }
-    elim (H A Hprem) => [X0 k n Φ Δ m Z Δ' |X0 k Φ Z Φ'] Y Hpol;
-    rewrite /fill_ca -fill_comp -fill_comp;
-    apply cstep_congr.
-    - epose proof (Hbv := bv_comp_pollin_self Hpol).
-      erewrite Hbv.
-      epose proof (Hp := R_pol _ _ _ Hpol).
-      rewrite -bshift_add Nat.add_comm in Hp.
-      apply rtc_once. rself.
-      exact Hp.
-    - epose proof (Hbv := bv_comp_pollin_wind Hpol).
-      erewrite Hbv.
-      epose proof (Hp := R_pol _ _ _ Hpol).
-      rewrite -bshift_add Nat.add_comm in Hp.
-      apply rtc_once. rself.
-      exact Hp.
+    elim (H A Hprem) => n [[B ?] [Y [Z [Hpol Hcomp]]]]; subst.
+    pose proof (Hp := R_pol _ _ _ Hpol).
+    rewrite -fill_comp -fill_comp; apply cstep_congr.
+    rewrite -shift_fshift in Hp |- *.
+    rewrite bunshift_shift in Hp.
+    apply rtc_once. rself.
+    exact Hp.
 
   (* Right contraction *)
   * apply IH1. intros. apply H.
@@ -607,17 +634,19 @@ Proof.
   * reflexivity.
 
   (* R∧ *)
-  * specialize (IH1 (X ⪡ Planter [] □ (shift (bv X) 0 <$> ⌈B⌉))).
-    rewrite /fill_ca in IH1 |- *.
-    repeat rewrite -fill_comp in IH1.
-    rewrite bv_comp /= Nat.add_0_r in IH1.
-    rewrite fmap_app.
+  * set X0 := Planter [] □ ⌈B⌉.
+    specialize (IH1 (X ⪡ X0)).
+    repeat rewrite -fill_comp /= in IH1.
     etransitivity; [> apply IH1 |].
-    - move => D HD. by apply assum_ca_comp_out.
+    - move => D HD.
+      case (H D HD) => n [Hshift Hassum].
+      exists n. split; auto.
+      pose proof (Hass := nassum_comp_out n ⌈D⌉ X X0 Hassum).
+      by rewrite /= bshift_zero Nat.add_0_r in Hass.
     - by apply IH2.
 
   (* R∨₁ *)
-  * specialize (IH1 (X ⪡ Petal ∅ [] 0 □ [0 ⋅ shift (bv X) 0 <$> ⌈B⌉])).
+  (* * specialize (IH1 (X ⪡ Petal ∅ [] 0 □ [0 ⋅ shift (bv X) 0 <$> ⌈B⌉])).
     rewrite /fill_ca in IH1 |- *.
     repeat rewrite -fill_comp in IH1.
     rewrite bv_comp /= Nat.add_0_r in IH1.
@@ -626,10 +655,11 @@ Proof.
     - move => D HD. by apply assum_ca_comp_out.
     - apply cstep_congr.
       rpetm (@nil nat) (@nil garden) [0 ⋅ shift (bv X) 0 <$> ⌈B⌉].
-      reflexivity.
+      reflexivity. *)
+  * admit.
 
   (* R∨₁ *)
-  * specialize (IH1 (X ⪡ Petal ∅ [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] 0 □ [])).
+  (* * specialize (IH1 (X ⪡ Petal ∅ [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] 0 □ [])).
     rewrite /fill_ca in IH1 |- *.
     repeat rewrite -fill_comp in IH1.
     rewrite bv_comp /= Nat.add_0_r in IH1.
@@ -638,24 +668,46 @@ Proof.
     - move => D HD. by apply assum_ca_comp_out.
     - apply cstep_congr.
       rpetm (@nil nat) [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] (@nil garden).
-      reflexivity.
+      reflexivity. *)
+  * admit.
 
   (* R⊃ *) 
-  * specialize (IH1 (X ⪡ Petal (0 ⋅ shift (bv X) 0 <$> ⌈A⌉) [] 0 □ [])).
-    rewrite /fill_ca in IH1 |- *.
-    repeat rewrite -fill_comp in IH1.
-    rewrite bv_comp /= Nat.add_0_r in IH1.
-    rewrite fmap_singl /=.
+  * set X0 := Petal (0 ⋅ ⌈A⌉) [] 0 □ [].
+    specialize (IH1 (X ⪡ X0)).
+    repeat rewrite -fill_comp /= in IH1.
     etransitivity; [> apply IH1 |].
     - move => D HD. decompose_elem_of_list.
-      + subst. apply (A_self _ _ 0).
-        rewrite Nat.add_0_r.
-        epose proof (Hpol := P_self _ □ _ [] [] _ 0 _).
-        list_simplifier. eapply Hpol.
-      + by apply assum_ca_comp_out.
+      + subst.
+        exists 0. split; [> apply is_shifted_zero |].
+        red.
+        rewrite bunshift_zero.
+        eexists. eexists.
+        split; [> |reflexivity]. rewrite /X0.
+        epose proof (Hp := P_self _ □ _ [] [] _ 0); list_simplifier.
+        eapply Hp.
+      + case (H D H0) => n [Hshift Hassum].
+        exists n. split; auto.
+        pose proof (Hass := nassum_comp_out n ⌈D⌉ X X0 Hassum).
+        by rewrite /= bshift_zero Nat.add_0_r in Hass.
     - apply cstep_congr.
       rpetm (@nil nat) (@nil garden) (@nil garden).
       reflexivity.
+
+  (* R∀ *)
+  * set X0 := Petal (1 ⋅ []) [] 0 □ [].
+    specialize (IH1 (X ⪡ X0)).
+    repeat rewrite -fill_comp /= in IH1.
+    etransitivity; [> apply IH1 |].
+    - move => D HD.
+      apply elem_of_map in HD.
+      case: HD => [E [HE1 HE2]].
+      case (H E HE1) => m [Hshift Hassum].
+      exists (m + 1). split.
+      { red. case: Hshift => F ?; subst.
+        exists F. by rewrite -fshift_add Nat.add_comm. }
+      pose proof (Hass := nassum_comp_out _ _ X X0 Hassum).
+      rewrite HE2 -shift_fshift.
+      by rewrite /= in Hass.
 Admitted.
 
 Theorem completeness Γ C :

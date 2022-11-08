@@ -155,6 +155,23 @@ Proof.
   intros. by apply shift_zero.
 Qed.
 
+Lemma bunshift_zero : ∀ (Φ : bouquet) c,
+  unshift 0 c <$> Φ = Φ.
+Proof.
+  intros. rewrite -{2}[Φ]map_id_ext. apply eq_map.
+  (* intros. by apply unshift_zero. *)
+(* Qed. *)
+Admitted.
+
+Lemma bunshift_add : ∀ (Φ : bouquet) n m c,
+  unshift (n + m) c <$> Φ = unshift n c <$> (unshift m c <$> Φ).
+Proof.
+Admitted.
+
+Lemma bunshift_shift n c (Φ : bouquet) :
+  unshift n c <$> (shift n c <$> Φ) = Φ.
+Admitted.
+
 Lemma gshift_zero : ∀ (γ : garden) c,
   gshift 0 c γ = γ.
 Proof.
@@ -378,6 +395,22 @@ Inductive pollin : bouquet -> nat -> ctx -> Prop :=
   Ψ ≺ (bv X) in (Planter (Φ ++ Ψ ++ Φ') X Φ'')
 where "Ψ ≺ n 'in' X" := (pollin Ψ n X).
 
+Lemma pollin_comp Ψ n Y Z :
+  Ψ ≺ n in Y ->
+  Ψ ≺ n + (bv Z) in Y ⪡ Z.
+Proof.
+  move => H. inv H; simpl.
+  * epose proof (P_self _ (X ⪡ Z) _ _ _ _ _ _).
+    rewrite bv_comp Nat.add_assoc in H.
+    eapply H.
+  * epose proof (P_wind_l _ (X ⪡ Z)).
+    rewrite bv_comp in H.
+    eapply H.
+  * epose proof (P_wind_r _ (X ⪡ Z)).
+    rewrite bv_comp in H.
+    eapply H.
+Qed.
+
 Lemma bv_comp_pollin_self {Y Ψ k n Φ Δ m X Δ'} :
   let Z := Petal (n ⋅ Φ) Δ m X Δ' in
   Ψ ≺ k in Z ->
@@ -398,8 +431,23 @@ Qed.
 
 (** ** Assumptions *)
 
-(* Definition assum (Ψ : bouquet) (X : ctx) :=
-  ∃ n Y Z, Ψ ≺ n in Z /\ X = Y ⪡ Z. *)
+Definition nassum (n : nat) (Ψ : bouquet) (X : ctx) :=
+  ∃ Y Z, unshift n 0 <$> Ψ ≺ n in Z /\ X = Y ⪡ Z.
+
+Lemma nassum_comp_out n Ψ X Y :
+  nassum n Ψ X ->
+  nassum (n + bv Y) (shift (bv Y) 0 <$> Ψ) (X ⪡ Y).
+Proof.
+  rewrite /nassum.
+  move => [Y0 [Z [Hpol Hcomp]]]. subst.
+  exists Y0. exists (Z ⪡ Y).
+  split; [> |by rewrite comp_assoc].
+  rewrite bunshift_add bunshift_shift.
+  by apply pollin_comp.
+Qed.
+
+Definition assum (Ψ : bouquet) (X : ctx) :=
+  ∃ n Y Z, unshift n 0 <$> Ψ ≺ n in Z /\ X = Y ⪡ Z.
 (* Notation "Ψ ∈ X" := (assum Ψ X). *)
 
 Reserved Notation "Ψ ∈! X" (at level 30).
