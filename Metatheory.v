@@ -586,9 +586,15 @@ Proof.
   exists A. by rewrite fshift_zero.
 Qed.
 
+Definition subctx (Γ : list form) (X : ctx) : Prop :=
+  forall D, D ∈ Γ -> exists n, is_shifted n D /\ nassum n ⌈D⌉ X.
+
+Infix "⪽" := subctx (at level 30).
+
+Ltac estep := etransitivity; [> eapply rtc_once |].
+
 Theorem full_completeness Γ C :
-  Γ c⟹ C -> forall X,
-  (forall D, D ∈ Γ -> exists n, is_shifted n D /\ nassum n ⌈D⌉ X) ->
+  Γ c⟹ C -> forall X, Γ ⪽ X ->
   X ⋖ ⌈C⌉ ~>* X ⋖ [].
 Proof.
   elim =>/= {Γ C} [
@@ -623,11 +629,11 @@ Proof.
     exact Hp.
 
   (* Right contraction *)
-  * apply IH1. intros. apply H.
+  * apply IH1. red. intros. apply H.
     decompose_elem_of_list; solve_elem_of_list.
 
   (* Left contraction *)
-  * apply IH1. intros. apply H.
+  * apply IH1. red. intros. apply H.
     decompose_elem_of_list; solve_elem_of_list.
 
   (* R⊤ *)
@@ -712,7 +718,29 @@ Proof.
       rpetm (@nil nat) (@nil garden) (@nil garden).
       reflexivity.
 
-  *
+  (* R∃ *)
+  * admit.
+
+  (* L⊤ *)
+  * admit.
+
+  (* L⊥ *)
+  * admit.
+
+  (* L∧ *)
+  * admit.
+
+  (* L∨ *)
+  * admit.
+
+  (* L⊃ *)
+  * admit.
+
+  (* L∀ *)
+  * admit.
+
+  (* L∃ *)
+  * admit.
 Admitted.
 
 Theorem completeness Γ C :
