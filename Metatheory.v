@@ -682,23 +682,39 @@ Theorem full_completeness Γ C :
 Proof.
   elim =>/= {Γ C} [
     A Γ Γ'
-  | A Γ Γ' Γ'' C Hp1 IH1
-  | A Γ Γ' Γ'' C Hp1 IH1
+  | A Γ Γ' Γ'' C _ IH1
+  | A Γ Γ' Γ'' C _ IH1
   | Γ
-  | A B Γ Hp1 IH1 Hp2 IH2
-  | A B Γ Hp1 IH1
-  | A B Γ Hp1 IH1
-  | A B Γ Hp1 IH1
-  | Γ C Hp1 IH1
-  | t Γ C Hp1 IH1
-  | Γ Γ' C Hp1 IH1
+  | A B Γ _ IH1 _ IH2
+  | A B Γ _ IH1
+  | A B Γ _ IH1
+  | A B Γ _ IH1
+  | Γ C _ IH1
+  | t Γ C _ IH1
+  | Γ Γ' C _ IH1
   | Γ Γ' C
-  | A B Γ Γ' C Hp1 IH1
-  | A B Γ Γ' C Hp1 IH1 Hp2 IH2
-  | A B Γ Γ' C Hp1 IH1 Hp2 IH2
-  | A t Γ Γ' C Hp1 IH1
+  | A B Γ Γ' C _ IH1
+  | A B Γ Γ' C _ IH1 _ IH2
+  | A B Γ Γ' C _ IH1 _ IH2
+  | A t Γ Γ' C _ IH1
   | A t Γ Γ' C IH1
   ] X H.
+
+  Ltac pull_hyp H A Γ Γ' :=
+    assert (HA : A ∈ (Γ ++ A :: Γ')); [> solve_elem_of_list |];
+    let Y := fresh "Y" in
+    let Z := fresh "Z" in
+    let Hpol := fresh "Hpol" in
+    let Hshifted := fresh "Hshifted" in
+    case (H A HA) => [n [Hshifted [Y [Z [Hpol Hcomp]]]]]; subst;
+    repeat rewrite -fill_comp;
+    estep; [> eapply R_ctx; eapply R_copolepis; eapply Hpol |];
+    rewrite (is_shifted_bshift_unshift _ _ Hshifted) /=;
+
+    assert (Hsubctx : (Γ ++ Γ') ⪽ Y ⪡ Z); [>
+      eapply subctx_subset; [> |eapply H];
+      apply proper_app_subseteq; auto;
+      by apply list_subseteq_cons |].
 
   (* Axiom *)
   * assert (Hprem : A ∈ (Γ ++ A :: Γ')).
@@ -800,18 +816,7 @@ Proof.
   * admit.
 
   (* L⊃ *)
-  * epose proof (HH := H (A ⊃ B) _).
-    case: HH => [n [Hshifted [Y [Z [Hpol Hcomp]]]]]; subst.
-    repeat rewrite -fill_comp.
-    estep. eapply R_ctx.
-    eapply R_copolepis. eapply Hpol.
-    Unshelve. all: cycle -1. solve_elem_of_list.
-    rewrite (is_shifted_bshift_unshift _ _ Hshifted) /=.
-
-    assert (Hsubctx : (Γ ++ Γ') ⪽ Y ⪡ Z).
-    { eapply subctx_subset; [> |eapply H].
-      apply proper_app_subseteq; auto.
-      by apply list_subseteq_cons. }
+  * pull_hyp H (A ⊃ B) Γ Γ'.
 
     set X1 := Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉].
     specialize (IH1 (Y ⪡ Z ⪡ X1)).
@@ -841,8 +846,18 @@ Proof.
     reflexivity.
 
   (* L∀ *)
-  * admit.
+  * pull_hyp H (#∀ A) Γ Γ'.
 
+    estep; [> rewrite fill_comp |].
+    { set X0 := Pistil 0 □ [0 ⋅ ⌈C⌉].
+      epose proof (Hctx := fill_comp _ X0 _).
+      rewrite /= in Hctx. rewrite /ftob.
+      erewrite Hctx. eapply R_ctx.
+      epose proof (Hipis := R_ipis 0 t 0 _ _).
+      eapply Hipis. lia. }
+
+    admit.
+    
   (* L∃ *)
   * admit.
 Admitted.
