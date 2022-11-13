@@ -90,6 +90,12 @@ Proof.
     exists x. split; auto.
 Qed.
 
+Lemma proper_app_subseteq {A} (l1 l1' l2 l2' : list A) :
+  l1 ⊆ l1' -> l2 ⊆ l2' ->
+  l1 ++ l2 ⊆ l1' ++ l2'.
+Proof.
+Admitted.
+
 Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
   (∀ x, In x l -> P x) <-> Forall P l.
 Proof.

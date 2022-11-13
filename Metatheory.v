@@ -137,6 +137,22 @@ Proof.
   rewrite IH /interp fsubst_subst //.
 Qed.
 
+Lemma grounding : ∀ X Φ Ψ,
+  ⟦Φ⟧ ⟺ ⟦Ψ⟧ ->
+  ⟦X ⋖ Φ⟧ ⟺ ⟦X ⋖ Ψ⟧.
+Proof.
+  elim => [Φ Ψ |Φ1 X IHX Φ2 Φ Ψ |n X IHX Δ Φ Ψ |γ Δ n X IHX Δ' Φ Ψ] H //=;
+  rewrite /interp/= in H IHX |- *.
+  * repeat rewrite fmap_app And_app.
+    rewrite (IHX Φ Ψ) //.
+  * rewrite (IHX Φ Ψ) //.
+  * case: γ => [m Θ].
+    do 2 rewrite [_ :: Δ']cons_app.
+    repeat rewrite fmap_app; do 2 rewrite fmap_singl.
+    repeat rewrite Or_app; do 2 rewrite Or_singl.
+    rewrite (IHX Φ Ψ) //.
+Qed.
+
 Lemma wpol X : ∀ (Ψ : bouquet),
   ⟦Ψ⟧ ∧ ⟦X ⋖ (shift (bv X) 0 <$> Ψ)⟧ ⟺
   ⟦Ψ⟧ ∧ ⟦X ⋖ []⟧.
@@ -413,14 +429,21 @@ Proof.
   (* Pollination *)
 
   * by apply pollination.
-  * symmetry; by apply pollination.
 
   (* Empty pistil *)
 
   * by apply epis_pis.
   * by apply epis_pet.
-  * symmetry. by apply epis_pis.
-  * symmetry. by apply epis_pet.
+
+  (* Co-pollination + co-empty pistil *)
+  * set Z := Pistil 0 □ [0 ⋅ Φ].
+    epose proof (Hpol := pollination (X ⪡ Z) Ψ n).
+    repeat rewrite -fill_comp /= in Hpol.
+    rewrite Hpol.
+    epose proof (Hp := pollin_comp_out _ n _ Z);
+    rewrite Nat.add_0_r /= in Hp; by eapply Hp.
+    apply grounding.
+    by rewrite /interp/= true_imp_l true_and false_or.
 
   (* Empty petal *)
 
@@ -434,22 +457,6 @@ Proof.
 
   * by apply ipis.
   * by apply ipet.
-Qed.
-
-Lemma grounding : ∀ X Φ Ψ,
-  ⟦Φ⟧ ⟺ ⟦Ψ⟧ ->
-  ⟦X ⋖ Φ⟧ ⟺ ⟦X ⋖ Ψ⟧.
-Proof.
-  elim => [Φ Ψ |Φ1 X IHX Φ2 Φ Ψ |n X IHX Δ Φ Ψ |γ Δ n X IHX Δ' Φ Ψ] H //=;
-  rewrite /interp/= in H IHX |- *.
-  * repeat rewrite fmap_app And_app.
-    rewrite (IHX Φ Ψ) //.
-  * rewrite (IHX Φ Ψ) //.
-  * case: γ => [m Θ].
-    do 2 rewrite [_ :: Δ']cons_app.
-    repeat rewrite fmap_app; do 2 rewrite fmap_singl.
-    repeat rewrite Or_app; do 2 rewrite Or_singl.
-    rewrite (IHX Φ Ψ) //.
 Qed.
 
 Theorem soundness : ∀ Φ Ψ,
@@ -586,10 +593,47 @@ Proof.
   exists A. by rewrite fshift_zero.
 Qed.
 
+Lemma is_shifted_bshift_unshift n A :
+  is_shifted n A ->
+  shift n 0 <$> (unshift n 0 <$> ⌈A⌉) = ⌈A⌉.
+Proof.
+  move => H.
+  rewrite unshift_funshift shift_fshift.
+  case: H => [B H]; by rewrite H funshift_fshift.
+Qed.
+
 Definition subctx (Γ : list form) (X : ctx) : Prop :=
   forall D, D ∈ Γ -> exists n, is_shifted n D /\ nassum n ⌈D⌉ X.
 
 Infix "⪽" := subctx (at level 30).
+
+Lemma subctx_comp_left Γ X Y :
+  Γ ⪽ X ->
+  Γ ⪽ X ⪡ Y.
+Proof.
+Admitted.
+
+Lemma subctx_comp_right Γ X Y :
+  Γ ⪽ Y ->
+  Γ ⪽ X ⪡ Y.
+Proof.
+Admitted.
+
+Lemma subctx_subset Γ Γ' X :
+  Γ ⊆ Γ' -> Γ' ⪽ X -> Γ ⪽ X.
+Admitted.
+
+Lemma subctx_app Γ Γ' X :
+  Γ ⪽ X -> Γ' ⪽ X ->
+  (Γ ++ Γ') ⪽ X.
+Proof.
+Admitted.
+
+Global Instance subctx_Permutation :
+  Proper ((≡ₚ) ==> (=) ==> (↔)) (subctx).
+Proof.
+  repeat red. move => Γ Γ' Hperm X Y Heq. split; intros.
+Admitted.
 
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
@@ -734,7 +778,45 @@ Proof.
   * admit.
 
   (* L⊃ *)
-  * admit.
+  * epose proof (HH := H (A ⊃ B) _).
+    case: HH => [n [Hshifted [Y [Z [Hpol Hcomp]]]]]; subst.
+    repeat rewrite -fill_comp.
+    estep. eapply R_ctx.
+    eapply R_copolepis. eapply Hpol.
+    Unshelve. all: cycle -1. solve_elem_of_list.
+    rewrite (is_shifted_bshift_unshift _ _ Hshifted) /=.
+
+    assert (Hsubctx : (Γ ++ Γ') ⪽ Y ⪡ Z).
+    { eapply subctx_subset; [> |eapply H].
+      apply proper_app_subseteq; auto.
+      by apply list_subseteq_cons. }
+
+    set X1 := Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉].
+    specialize (IH1 (Y ⪡ Z ⪡ X1)).
+    repeat rewrite -fill_comp /= in IH1.
+    etransitivity; [> apply IH1 |].
+    - apply subctx_comp_left. apply Hsubctx.
+    - etransitivity. rewrite fill_comp. eapply cstep_congr.
+      repispis 0 0 (@nil flower) (@nil flower). reflexivity.
+
+      set X2 := Petal (0 ⋅ ⌈B⌉) [] 0 □ [].
+      specialize (IH2 (Y ⪡ Z ⪡ X2)).
+      repeat rewrite -fill_comp /= in IH2 |- *.
+      etransitivity; [> apply IH2 |].
+      + assert (Hperm : Γ ++ B :: Γ' ≡ₚ (Γ ++ Γ') ++ [B]). { solve_Permutation. }
+        rewrite Hperm. apply subctx_app.
+        apply subctx_comp_left; apply Hsubctx.
+        apply subctx_comp_right. rewrite /X2.
+        red. move => D HD. inv HD.
+        exists 0. split; [> apply is_shifted_zero |].
+        red. exists □. exists X2. split; auto.
+        epose proof (Hw := P_self _ □ 0 [] [] [] 0 []); list_simplifier.
+        rewrite bunshift_zero. eapply Hw.
+        inv H2.
+
+      + repeat rewrite fill_comp. eapply cstep_congr.
+        rpetm (@nil nat) (@nil garden) (@nil garden).
+        reflexivity.
 
   (* L∀ *)
   * admit.
@@ -743,7 +825,7 @@ Proof.
   * admit.
 Admitted.
 
-Theorem completeness Γ C :
+(* Theorem completeness Γ C :
   Γ c⟹ C ->
   ⌈⋀ Γ ⊃ C⌉ ~>* [].
 Proof.
@@ -1013,7 +1095,7 @@ Proof.
     rctxmH [0;1;0] IH1.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-Qed.
+Qed. *)
 
 End Completeness.
 
@@ -1028,7 +1110,7 @@ Theorem deduction Φ Ψ :
 Proof.
   split; rewrite /entails; move => H.
 
-  * rctxmH [0;1] H.
+  (* * rctxmH [0;1] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
 
@@ -1040,4 +1122,5 @@ Proof.
     rctxmH [0;1;0] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-Qed.
+Qed. *)
+Admitted.

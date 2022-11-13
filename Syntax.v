@@ -395,7 +395,7 @@ Inductive pollin : bouquet -> nat -> ctx -> Prop :=
   Ψ ≺ (bv X) in (Planter (Φ ++ Ψ ++ Φ') X Φ'')
 where "Ψ ≺ n 'in' X" := (pollin Ψ n X).
 
-Lemma pollin_comp Ψ n Y Z :
+Lemma pollin_comp_out Ψ n Y Z :
   Ψ ≺ n in Y ->
   Ψ ≺ n + (bv Z) in Y ⪡ Z.
 Proof.
@@ -443,7 +443,7 @@ Proof.
   exists Y0. exists (Z ⪡ Y).
   split; [> |by rewrite comp_assoc].
   rewrite bunshift_add bunshift_shift.
-  by apply pollin_comp.
+  by apply pollin_comp_out.
 Qed.
 
 Definition assum (Ψ : bouquet) (X : ctx) :=
@@ -499,11 +499,6 @@ Inductive step : bouquet -> bouquet -> Prop :=
   X ⋖ (shift n 0 <$> Ψ) ⇀
   X ⋖ []
 
-| R_co_pol (Ψ : bouquet) n X :
-  Ψ ≺ n in X ->
-  X ⋖ [] ⇀
-  X ⋖ (shift n 0 <$> Ψ)
-
 (** *** Empty pistil *)
 
 | R_epis_pis m Ψ n Φ Φ' Δ :
@@ -514,13 +509,12 @@ Inductive step : bouquet -> bouquet -> Prop :=
   γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ' ⇀
   γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'
 
-| R_co_epis_pis m Ψ n Φ Φ' Δ :
-  n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ (gshift m 0 <$> Δ) ⇀
-  n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ
+(** *** Co-pollination + co-empty pistil *)
 
-| R_co_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ' ⇀
-  γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'
+| R_copolepis (Ψ Φ : bouquet) n X :
+  Ψ ≺ n in X ->
+  X ⋖ Φ ⇀
+  X ⋖ (0 ⋅ shift n 0 <$> Ψ ⊢ [0 ⋅ Φ])
 
 (** *** Empty petal *)
 
@@ -812,7 +806,7 @@ Ltac rspolm p Φl Φr :=
     rspol p Φl Φr
   |].
 
-Ltac rscopol Y n Φl Ψ Φr :=
+(* Ltac rscopol Y n Φl Ψ Φr :=
   let H := fresh "H" in
   pose proof (H := R_co_pol Ψ n Y); list_simplifier;
   repeat rewrite bshift_zero/= in H;
@@ -897,7 +891,7 @@ Ltac rcoepispet n m Φl Φr Δl Δr :=
       repeat rewrite bshift_zero in H;
       etransitivity; [> eapply rtc_once; rself; eapply H |];
       clear H
-  end.
+  end. *)
 
 Ltac repispet n m Φl Φr Δl Δr :=
   rewrite /ftob;
@@ -911,7 +905,7 @@ Ltac repispet n m Φl Φr Δl Δr :=
       clear H
   end.
 
-Ltac rcoepispis n m Φl Φr :=
+(* Ltac rcoepispis n m Φl Φr :=
   rewrite /ftob;
   match goal with
   | |- [_ ⊢ ?Δ] ~>* _ =>
@@ -922,7 +916,7 @@ Ltac rcoepispis n m Φl Φr :=
       repeat rewrite pshift_zero in H;
       etransitivity; [> eapply rtc_once; rself; eapply H |];
       clear H
-  end.
+  end. *)
 
 Ltac repispis n m Φl Φr :=
   rewrite /ftob;
