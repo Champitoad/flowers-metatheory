@@ -90,11 +90,30 @@ Proof.
     exists x. split; auto.
 Qed.
 
-Lemma proper_app_subseteq {A} (l1 l1' l2 l2' : list A) :
+Lemma subseteq_cons_nil {A} (x : A) (l : list A) :
+  ~ (x :: l) ⊆ [].
+Proof.
+  red. move => H. red in H. red in H.
+  specialize (H x (elem_of_list_here x l)).
+  inv H.
+Qed.
+
+Lemma subseteq_nil {A} (l : list A) :
+  l ⊆ [] -> l = [].
+Proof.
+  case: l => [|x l] H; auto.
+  destruct (subseteq_cons_nil x l H).
+Qed.
+
+Lemma proper_app_subseteq {A} : forall (l1' l1 l2 l2' : list A),
   l1 ⊆ l1' -> l2 ⊆ l2' ->
   l1 ++ l2 ⊆ l1' ++ l2'.
 Proof.
-Admitted.
+  rewrite /subseteq /list_subseteq.
+  intros.
+  decompose_elem_of_list;
+  solve_elem_of_list.
+Qed.
 
 Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
   (∀ x, In x l -> P x) <-> Forall P l.

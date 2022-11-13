@@ -434,6 +434,17 @@ Qed.
 Definition nassum (n : nat) (Ψ : bouquet) (X : ctx) :=
   ∃ Y Z, unshift n 0 <$> Ψ ≺ n in Z /\ X = Y ⪡ Z.
 
+Lemma nassum_comp_in n Ψ X Y :
+  nassum n Ψ Y ->
+  nassum n Ψ (X ⪡ Y).
+Proof.
+  rewrite /nassum.
+  move => [Y0 [Z [Hpol Hcomp]]]. subst.
+  exists (X ⪡ Y0). exists Z.
+  split; [> |by rewrite comp_assoc].
+  done.
+Qed.
+
 Lemma nassum_comp_out n Ψ X Y :
   nassum n Ψ X ->
   nassum (n + bv Y) (shift (bv Y) 0 <$> Ψ) (X ⪡ Y).

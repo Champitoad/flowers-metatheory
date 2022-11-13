@@ -607,33 +607,72 @@ Definition subctx (Γ : list form) (X : ctx) : Prop :=
 
 Infix "⪽" := subctx (at level 30).
 
-Lemma subctx_comp_left Γ X Y :
+Lemma subctx_comp_out Γ X Y :
   Γ ⪽ X ->
-  Γ ⪽ X ⪡ Y.
+  (fshift (bv Y) 0 <$> Γ) ⪽ X ⪡ Y.
 Proof.
-Admitted.
+  rewrite /subctx.
+  move => H D HD.
+  apply elem_of_map in HD.
+  case: HD => [E [HE1 HE2]].
+  case (H E HE1) => m [Hshift Hassum].
+  exists (m + bv Y). split.
+  { red. case: Hshift => F ?; subst.
+    exists F. by rewrite -fshift_add Nat.add_comm. }
+  pose proof (Hass := nassum_comp_out _ _ X Y Hassum).
+  rewrite HE2 -shift_fshift.
+  by rewrite /= in Hass.
+Qed.
 
-Lemma subctx_comp_right Γ X Y :
+Ltac subctxout H :=
+  match goal with
+  | |- _ ⪽ _ ⪡ ?Y =>
+      let Hsub := fresh "Hsub" in
+      pose proof (Hsub := subctx_comp_out _ _ Y H);
+      rewrite /= in Hsub;
+      try rewrite cshift_zero in Hsub;
+      done
+  end.
+
+Lemma subctx_comp_in Γ X Y :
   Γ ⪽ Y ->
   Γ ⪽ X ⪡ Y.
 Proof.
-Admitted.
+  rewrite /subctx.
+  move => H D HD.
+  case (H D HD) => n [Hs Ha].
+  exists n. split; auto.
+  by apply nassum_comp_in.
+Qed.
 
 Lemma subctx_subset Γ Γ' X :
   Γ ⊆ Γ' -> Γ' ⪽ X -> Γ ⪽ X.
-Admitted.
+Proof.
+  rewrite /subctx.
+  move => Hsubset H D HD.
+  case (H D (Hsubset D HD)) => n Ha.
+  by exists n.
+Qed.
 
 Lemma subctx_app Γ Γ' X :
   Γ ⪽ X -> Γ' ⪽ X ->
   (Γ ++ Γ') ⪽ X.
 Proof.
-Admitted.
+  rewrite /subctx.
+  move => H H' D HD.
+  decompose_elem_of_list.
+  * case (H D H0) => n Ha. by exists n.
+  * case (H' D H0) => n Ha. by exists n.
+Qed.
 
 Global Instance subctx_Permutation :
   Proper ((≡ₚ) ==> (=) ==> (↔)) (subctx).
 Proof.
-  repeat red. move => Γ Γ' Hperm X Y Heq. split; intros.
-Admitted.
+  repeat red. move => Γ Γ' Hperm X Y Heq; subst.
+  rewrite /subctx. split; move => H D HD.
+  * rewrite -Hperm in HD. by apply H.
+  * rewrite Hperm in HD. by apply H.
+Qed.
 
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
@@ -665,10 +704,9 @@ Proof.
   * assert (Hprem : A ∈ (Γ ++ A :: Γ')).
     { solve_elem_of_list. }
     elim (H A Hprem) => n [[B ?] [Y [Z [Hpol Hcomp]]]]; subst.
+    rewrite -shift_fshift bunshift_shift in Hpol |- *.
     pose proof (Hp := R_pol _ _ _ Hpol).
     rewrite -fill_comp -fill_comp; apply cstep_congr.
-    rewrite -shift_fshift in Hp |- *.
-    rewrite bunshift_shift in Hp.
     apply rtc_once. rself.
     exact Hp.
 
@@ -688,11 +726,7 @@ Proof.
     specialize (IH1 (X ⪡ X0)).
     repeat rewrite -fill_comp /= in IH1.
     etransitivity; [> apply IH1 |].
-    - move => D HD.
-      case (H D HD) => n [Hshift Hassum].
-      exists n. split; auto.
-      pose proof (Hass := nassum_comp_out n ⌈D⌉ X X0 Hassum).
-      by rewrite /= bshift_zero Nat.add_0_r in Hass.
+    - subctxout H.
     - by apply IH2.
 
   (* R∨₁ *)
@@ -726,19 +760,16 @@ Proof.
     specialize (IH1 (X ⪡ X0)).
     repeat rewrite -fill_comp /= in IH1.
     etransitivity; [> apply IH1 |].
-    - move => D HD. decompose_elem_of_list.
-      + subst.
+    - rewrite cons_app. apply subctx_app.
+      + apply subctx_comp_in.
+        move => D HD. inv HD; [> |inv H2].
         exists 0. split; [> apply is_shifted_zero |].
-        red.
-        rewrite bunshift_zero.
-        eexists. eexists.
+        red. rewrite bunshift_zero.
+        exists □. exists X0.
         split; [> |reflexivity]. rewrite /X0.
         epose proof (Hp := P_self _ □ _ [] [] _ 0); list_simplifier.
         eapply Hp.
-      + case (H D H0) => n [Hshift Hassum].
-        exists n. split; auto.
-        pose proof (Hass := nassum_comp_out n ⌈D⌉ X X0 Hassum).
-        by rewrite /= bshift_zero Nat.add_0_r in Hass.
+      + subctxout H.
     - apply cstep_congr.
       rpetm (@nil nat) (@nil garden) (@nil garden).
       reflexivity.
@@ -748,16 +779,7 @@ Proof.
     specialize (IH1 (X ⪡ X0)).
     repeat rewrite -fill_comp /= in IH1.
     etransitivity; [> apply IH1 |].
-    - move => D HD.
-      apply elem_of_map in HD.
-      case: HD => [E [HE1 HE2]].
-      case (H E HE1) => m [Hshift Hassum].
-      exists (m + 1). split.
-      { red. case: Hshift => F ?; subst.
-        exists F. by rewrite -fshift_add Nat.add_comm. }
-      pose proof (Hass := nassum_comp_out _ _ X X0 Hassum).
-      rewrite HE2 -shift_fshift.
-      by rewrite /= in Hass.
+    - subctxout H.
     - apply cstep_congr.
       rpetm (@nil nat) (@nil garden) (@nil garden).
       reflexivity.
@@ -794,29 +816,29 @@ Proof.
     set X1 := Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉].
     specialize (IH1 (Y ⪡ Z ⪡ X1)).
     repeat rewrite -fill_comp /= in IH1.
-    etransitivity; [> apply IH1 |].
-    - apply subctx_comp_left. apply Hsubctx.
-    - etransitivity. rewrite fill_comp. eapply cstep_congr.
-      repispis 0 0 (@nil flower) (@nil flower). reflexivity.
+    etransitivity; [> apply IH1; subctxout Hsubctx |].
 
-      set X2 := Petal (0 ⋅ ⌈B⌉) [] 0 □ [].
-      specialize (IH2 (Y ⪡ Z ⪡ X2)).
-      repeat rewrite -fill_comp /= in IH2 |- *.
-      etransitivity; [> apply IH2 |].
-      + assert (Hperm : Γ ++ B :: Γ' ≡ₚ (Γ ++ Γ') ++ [B]). { solve_Permutation. }
-        rewrite Hperm. apply subctx_app.
-        apply subctx_comp_left; apply Hsubctx.
-        apply subctx_comp_right. rewrite /X2.
-        red. move => D HD. inv HD.
-        exists 0. split; [> apply is_shifted_zero |].
-        red. exists □. exists X2. split; auto.
-        epose proof (Hw := P_self _ □ 0 [] [] [] 0 []); list_simplifier.
-        rewrite bunshift_zero. eapply Hw.
-        inv H2.
+    etransitivity. rewrite fill_comp. eapply cstep_congr.
+    repispis 0 0 (@nil flower) (@nil flower). reflexivity.
 
-      + repeat rewrite fill_comp. eapply cstep_congr.
-        rpetm (@nil nat) (@nil garden) (@nil garden).
-        reflexivity.
+    set X2 := Petal (0 ⋅ ⌈B⌉) [] 0 □ [].
+    specialize (IH2 (Y ⪡ Z ⪡ X2)).
+    repeat rewrite -fill_comp /= in IH2 |- *.
+    etransitivity; [> apply IH2 |].
+    { assert (Hperm : Γ ++ B :: Γ' ≡ₚ (Γ ++ Γ') ++ [B]). { solve_Permutation. }
+      rewrite Hperm. apply subctx_app.
+      subctxout Hsubctx.
+      apply subctx_comp_in. rewrite /X2.
+      red. move => D HD. inv HD.
+      exists 0. split; [> apply is_shifted_zero |].
+      red. exists □. exists X2. split; auto.
+      epose proof (Hw := P_self _ □ 0 [] [] [] 0 []); list_simplifier.
+      rewrite bunshift_zero. eapply Hw.
+      inv H2. }
+
+    repeat rewrite fill_comp. eapply cstep_congr.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
 
   (* L∀ *)
   * admit.

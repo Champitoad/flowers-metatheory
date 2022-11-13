@@ -261,6 +261,13 @@ Proof.
   * f_equal. by rewrite IHA.
 Qed.
 
+Lemma cshift_zero : ∀ (Γ : list form) c,
+  fshift 0 c <$> Γ = Γ.
+Proof.
+  intros. rewrite -{2}[Γ]map_id_ext. apply eq_map.
+  intros. by apply fshift_zero.
+Qed.
+
 Lemma fshift_succ : ∀ A c n,
   fshift (S n) c A = fshift 1 c (fshift n c A).
 Proof.
