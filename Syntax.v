@@ -240,40 +240,6 @@ Proof.
   intros. by apply shift_comm.
 Qed.
 
-(** ** Juxtaposition of gardens *)
-
-(* Definition juxt '(n ⋅ Φ) '(m ⋅ Ψ) :=
-  (n + m) ⋅ (shift m 0 <$> Φ) ++ (shift n m <$> Ψ).
-
-Definition Juxt : list garden -> garden :=
-  foldr juxt ∅.
-
-Infix "∪" := juxt.
-Notation "⋃ Δ" := (Juxt Δ).
-
-Lemma juxt_empty γ :
-  ∅ ∪ γ = γ.
-Proof.
-  case γ => n Φ //=.
-  pose proof (eq_map (shift 0 n) id Φ (λ ϕ, shift_zero ϕ n)).
-  by rewrite H list_fmap_id.
-Qed. *)
-
-Definition juxt (Φ Ψ : bouquet) :=
-  Φ ++ Ψ.
-
-Definition Juxt : list bouquet -> bouquet :=
-  foldr app [].
-
-Infix "∪" := juxt.
-Notation "⋃ Φs" := (Juxt Φs).
-
-Lemma Juxt_Bind : ∀ (Φs : list bouquet),
-  ⋃ Φs = Φ ← Φs; Φ.
-Proof.
-  reflexivity.
-Qed.
-
 (** * Contexts *)
 
 Inductive ctx :=
@@ -308,12 +274,6 @@ Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
   | Petal γ Δ n X Δ' => [γ ⊢ Δ ++ [n ⋅ X ⋖ Ψ] ++ Δ']
   end
 where "X ⋖ Ψ" := (fill Ψ X).
-
-(* Capture-avoiding *)
-Definition fill_ca Ψ X :=
-  X ⋖ (shift (bv X) 0 <$> Ψ).
-
-Notation "X ⋖! Ψ" := (fill_ca Ψ X) (at level 15).
 
 Reserved Infix "⪡" (at level 15).
 
@@ -416,10 +376,6 @@ Definition bset (Ψ : bouquet) (p : path) (Φ : bouquet) : option bouquet :=
   let '(X, _) := X_ in
   Some (X ⋖ Ψ).
 
-Open Scope string_scope.
-Compute λ ϕ : flower, bset [] [1] [∅ ⊢ [(0 ⋅ [ϕ; Atom "a" []]); (4 ⋅ [Atom "c" []])]].
-Close Scope string_scope.
-
 (** * Rules *)
 
 (** ** Pollination predicate *)
@@ -495,46 +451,6 @@ Proof.
   split; [> |by rewrite comp_assoc].
   rewrite bunshift_shift.
   by apply pollin_comp_out.
-Qed.
-
-Definition assum (Ψ : bouquet) (X : ctx) :=
-  ∃ n Y Z, unshift n 0 <$> Ψ ≺ n in Z /\ X = Y ⪡ Z.
-(* Notation "Ψ ∈ X" := (assum Ψ X). *)
-
-Reserved Notation "Ψ ∈! X" (at level 30).
-
-(* Capture-avoiding *)
-Inductive assum_ca Ψ : ctx -> Prop :=
-| A_self X k n Φ Δ m Z Δ' :
-  let Y := Petal (n ⋅ Φ) Δ m Z Δ' in
-  shift (bv X + n) 0 <$> Ψ ≺ k in Y ->
-  Ψ ∈! X ⪡ Y
-| A_wind X k Φ Z Φ' :
-  let Y := Planter Φ Z Φ' in
-  shift (bv X) 0 <$> Ψ ≺ k in Y ->
-  Ψ ∈! X ⪡ Y
-where "Ψ ∈! X" := (assum_ca Ψ X).
-
-Lemma assum_ca_comp_out Ψ X Y :
-  Ψ ∈! X ->
-  Ψ ∈! X ⪡ Y.
-Proof.
-  elim => {X}; intros; rewrite comp_assoc.
-  * apply (A_self _ _ (k + bv Y) _ _ _ _ (Z ⪡ Y)).
-    inve H. rewrite -Nat.add_assoc -bv_comp. econs.
-  * apply (A_wind _ _ (k + bv Y) _ (Z ⪡ Y)).
-    inve H; rewrite -bv_comp; econs.
-Qed.
-
-Lemma assum_ca_comp_in Ψ X Y :
-  (shift (bv X) 0 <$> Ψ) ∈! Y ->
-  Ψ ∈! X ⪡ Y.
-Proof.
-  elim => {Y}; intros; rewrite -comp_assoc.
-  * apply (A_self _ (X ⪡ X0) k).
-    inve H. rewrite -bshift_add bv_comp -Nat.add_assoc Nat.add_comm. econs.
-  * apply (A_wind _ (X ⪡ X0) k).
-    inve H; rewrite -bshift_add bv_comp Nat.add_comm; econs.
 Qed.
 
 (** ** Local rules *)
@@ -623,6 +539,56 @@ Proof.
   rewrite fill_comp fill_comp.
   by apply (R_ctx (X ⪡ X0) Φ0 Ψ0).
 Qed.
+
+(** * Variant with the grow rule *)
+
+(** ** Polarized contexts *)
+
+Inductive pctx :=
+| PHole
+| PPlanter (Φ : bouquet) (P : pctx) (Φ' : bouquet)
+| PPistil (n : nat) (N : nctx) (Δ : list garden)
+| PPetal (γ : garden) (Δ : list garden) (n : nat) (P : pctx) (Δ' : list garden)
+with nctx :=
+| NPistil (n : nat) (P : pctx) (Δ : list garden).
+
+Fixpoint pctx_to_ctx (P : pctx) : ctx :=
+  match P with
+  | PHole => Hole
+  | PPlanter Φ P Φ' => Planter Φ (pctx_to_ctx P) Φ'
+  | PPistil n N Δ => Pistil n (nctx_to_ctx N) Δ
+  | PPetal γ Δ n P Δ' => Petal γ Δ n (pctx_to_ctx P) Δ'
+  end
+with nctx_to_ctx (N : nctx) : ctx :=
+  match N with
+  | NPistil n P Δ => Pistil n (pctx_to_ctx P) Δ
+  end.
+
+Coercion pctx_to_ctx : pctx >-> ctx.
+Coercion nctx_to_ctx : nctx >-> ctx.
+
+(** ** Contextual closure + structural rules *)
+
+Reserved Infix "≈>" (at level 80).
+
+Inductive sstep : bouquet -> bouquet -> Prop :=
+
+(** *** Congruence *)
+
+| Rg_ctx (X : ctx) (Φ Ψ : bouquet) :
+  Φ ⇀ Ψ ->
+  X ⋖ Φ ≈> X ⋖ Ψ
+
+| Rg_grow (P : pctx) (Φ : bouquet) :
+  P ⋖ [] ≈> P ⋖ Φ
+
+where "Φ ≈> Ψ" := (sstep Φ Ψ).
+
+(** ** Transitive closure *)
+
+Infix "≈>*" := (rtc sstep) (at level 80).
+
+Notation "Φ <≈> Ψ" := (Φ ≈>* Ψ /\ Ψ ≈>* Φ) (at level 80).
 
 (** * Basic proof search *)
 

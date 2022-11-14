@@ -465,6 +465,16 @@ Proof.
   apply grounding. by apply local_soundness.
 Qed.
 
+(** Soundness of structural rules *)
+
+Lemma grow (P : pctx) Φ :
+  [⟦P ⋖ Φ⟧] ⟹ ⟦P ⋖ []⟧.
+Admitted.
+
+Theorem ssoundness Φ Ψ :
+  Φ ≈>* Ψ -> [⟦Ψ⟧] ⟹ ⟦Φ⟧.
+Admitted.
+
 (** * Completeness *)
 
 Reserved Notation "⌈ A ⌉" (format "⌈ A ⌉", at level 0).
@@ -482,7 +492,9 @@ Fixpoint finterp (A : form) : bouquet :=
   end
 where "⌈ A ⌉" := (finterp A).
 
-Notation "⌈[ Γ ]⌉" := (A ← Γ; ⌈A⌉).
+Definition cinterp Γ := A ← Γ; ⌈A⌉.
+
+Notation "⌈[ Γ ]⌉" := (cinterp Γ).
 
 Lemma finterp_And : ∀ (Γ : list form),
   ⌈⋀ Γ⌉ = ⌈[Γ]⌉.
@@ -506,7 +518,7 @@ Lemma bshift_fshift : forall Γ n c,
   shift n c <$> ⌈[Γ]⌉ = ⌈[fshift n c <$> Γ]⌉.
 Proof.
   elim => [|A Γ IH] n c //.
-  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  rewrite /cinterp bind_cons fmap_cons fmap_app bind_cons.
   by rewrite shift_fshift IH.
 Qed.
 
@@ -526,7 +538,7 @@ Lemma bunshift_funshift : forall Γ n c,
   unshift n c <$> ⌈[Γ]⌉ = ⌈[funshift n c <$> Γ]⌉.
 Proof.
   elim => [|A Γ IH] n c //.
-  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  rewrite /cinterp bind_cons fmap_cons fmap_app bind_cons.
   by rewrite unshift_funshift IH.
 Qed.
 
@@ -547,7 +559,7 @@ Lemma bsubst_fsubst : forall Γ i t,
   subst i t <$> ⌈[Γ]⌉ = ⌈[fsubst i t <$> Γ]⌉.
 Proof.
   elim => [|A Γ IH] n c //.
-  rewrite bind_cons fmap_cons fmap_app bind_cons.
+  rewrite /cinterp bind_cons fmap_cons fmap_app bind_cons.
   by rewrite subst_fsubst IH.
 Qed.
 
@@ -708,7 +720,7 @@ Ltac subctxpet Φl Φr Δ Δ' :=
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
 Theorem deep_completeness Γ C :
-  Γ c⟹ C -> forall X, Γ ⪽ X ->
+  Γ s⟹ C -> forall X, Γ ⪽ X ->
   X ⋖ ⌈C⌉ ~>* X ⋖ [].
 Proof.
   elim =>/= {Γ C} [
@@ -957,12 +969,12 @@ Lemma elem_of_finterp A Γ :
 Proof.
   move => H.
   case (elem_of_cons_app _ _ H) => [Γ1 [Γ2 HΓ]].
-  rewrite HΓ finterp_And bind_app bind_cons.
+  rewrite HΓ finterp_And /cinterp bind_app bind_cons.
   by exists ⌈[Γ1]⌉; exists ⌈[Γ2]⌉.
 Qed.
 
 Theorem completeness Γ C :
-  Γ c⟹ C ->
+  Γ s⟹ C ->
   ⌈⋀ Γ ⊃ C⌉ ~>* [].
 Proof.
   move => H.
@@ -981,7 +993,61 @@ Proof.
   reflexivity.
 Qed.
 
-(** * Deduction *)
+(** * Provability *)
+
+Definition prov Φ := Φ ~>* [].
+Definition eqprov Φ Ψ := prov Φ <-> prov Ψ.
+
+Infix "≡" := eqprov.
+
+Definition sprov Φ := Φ ≈>* [].
+Definition eqsprov Φ Ψ := sprov Φ <-> sprov Ψ.
+
+#[export] Instance equiv_eqprov : Equivalence eqprov.
+Proof.
+  econs; red; rewrite /eqprov; intros.
+  by reflexivity.
+  by symmetry.
+  etransitivity; eauto.
+Qed.
+
+Lemma cstep_gstep Φ Ψ :
+  Φ ~>* Ψ -> Φ ≈>* Ψ.
+Proof.
+  elim => [Φ1 |Φ1 Φ2 Φ3 Hstep _ IH]. reflexivity.
+  apply (rtc_l _ _ Φ2).
+  { case: Hstep => {Φ Ψ} [X Φ Ψ Hstep]. by apply Rg_ctx. }
+  exact IH.
+Qed.
+
+Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⊢ [0 ⋅ Ψ]).
+Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⊢ [0 ⋅ Ψ]).
+
+Infix "|~" := entails (at level 90).
+Infix "|≈" := sentails (at level 90).
+
+Lemma entails_sentails Φ Ψ :
+  Φ |~ Ψ -> Φ |≈ Ψ.
+Proof.
+  by apply cstep_gstep.
+Qed.
+
+(* Global Instance sentails_po : PreOrder sentails.
+Proof.
+  econs; red.
+  * move => Φ. apply entails_sentails. red.
+    pose proof (Hpol := R_pol Φ 0 (Petal (0 ⋅ Φ) [] 0 □ [])).
+    rewrite /= bshift_zero in Hpol. red.
+    estep. rself. eapply Hpol.
+    pose proof (Hp := P_self Φ □ 0 [] [] [] 0 []); list_simplifier.
+    exact Hp.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
+  * rewrite /sentails. move => Φ1 Φ2 Φ3 H1 H2.
+    admit.
+Admitted. *)
+
+(** ** Deduction *)
 
 Lemma coepis Φ :
   Φ ~>* ⊢ [0 ⋅ Φ].
@@ -994,16 +1060,105 @@ Proof.
   reflexivity.
 Qed.
 
-Definition entails (Φ Ψ : bouquet) := 0 ⋅ Φ ⊢ [0 ⋅ Ψ] ~>* [].
-
-Infix "===>" := entails (at level 90).
-
 Theorem deduction Φ Ψ :
-  Φ ===> Ψ <-> [] ===> 0 ⋅ Φ ⊢ [0 ⋅ Ψ].
+  Φ |~ Ψ <-> [] |~ 0 ⋅ Φ ⊢ [0 ⋅ Ψ].
 Proof.
-  split; rewrite /entails; move => H.
+  split; rewrite /entails; move => H; red in H |- *.
   * rctxmH [0;1] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
   * etransitivity. eapply coepis. done.
+Qed.
+
+(** ** Admissibility of structural rules *)
+
+(** Currently structural rules only comprise the grow rule, but the above
+    completeness proof entails admissibility of any imaginable sound rule,
+    like the fall (weakening) rule or permutations for gardens and petals. *)
+
+Lemma flower_to_form_weak_iso : forall (ϕ : flower),
+  ⌈⌊ϕ⌋⌉ ≡ ϕ.
+Proof.
+  elim/flower_induction => [p args |[n Φ] Δ IHγ IHΔ] //=.
+  elim: n => [|n IHn] /=.
+  * admit.
+  * admit.
+Admitted.
+
+Lemma interp_weak_iso : forall (Φ : bouquet),
+  ⌈[⌊[Φ]⌋]⌉ ≡ Φ.
+Proof.
+Admitted.
+
+Add Morphism cinterp with signature
+  Forall2 eqderiv ==> eqprov
+  as proper_cinterp_eqprov.
+Proof.
+  move => Γ Γ' H.
+  split; rewrite /prov; intro Hp.
+Admitted.
+
+Add Morphism prov with signature
+  eqprov ==> iff
+  as proper_prov_eqprov.
+Admitted.
+
+Lemma finterp_interp Φ :
+  ⌈⟦Φ⟧⌉ = ⌈[⌊[Φ]⌋]⌉.
+Proof.
+  by rewrite /interp/= finterp_And.
+Qed.
+
+Lemma interp_entails Φ Ψ :
+  ⌈⟦Φ⟧⌉ |~ ⌈⟦Ψ⟧⌉ ->
+  Φ |~ Ψ.
+Proof.
+  move => H.
+  pose proof (Hiso := interp_weak_iso (0 ⋅ Φ ⊢ [0 ⋅ Ψ])).
+  rewrite [⌊[_]⌋]/= false_or/= finterp_And finterp_And in Hiso.
+  repeat rewrite finterp_interp in H. red in H.
+  rewrite /ftob Hiso in H.
+  apply deduction in H.
+  by apply deduction.
+Qed.
+
+Theorem structural_admissibility Φ Ψ :
+  Φ |≈ Ψ -> Φ |~ Ψ.
+Proof.
+  move => H. red in H.
+  apply ssoundness in H.
+  rewrite /interp/= true_and false_or in H.
+  apply Semantics.structural_admissibility in H.
+  apply completeness in H. rewrite /= in H.
+  apply deduction in H.
+  by apply interp_entails.
+Qed.
+
+(** * Semantical adequation *)
+
+(** This is the more standard model-theoretical formulation of
+    soundness/completeness. It allows to dispense with the semantics -> syntax
+    translation [finterp] from formulas to flowers in the statement, and
+    ensures that it is the (weak) inverse of the syntax -> semantics
+    interpretation [interp]. *)
+
+Definition mentails (Φ Ψ : bouquet) := [⟦Φ⟧] ⟹ ⟦Ψ⟧.
+
+Infix "|=" := mentails (at level 90).
+
+Theorem adequation Φ Ψ :
+  Φ |~ Ψ <-> Φ |= Ψ.
+Proof.
+  split; move => H.
+
+  (* Soundness *)
+  * apply soundness in H.
+    rewrite /interp/= true_and false_or in H.
+    apply Semantics.deduction.
+    rewrite H. isrch.
+
+  (* Completeness *)
+  * apply Semantics.structural_admissibility in H.
+    apply completeness in H. rewrite /= in H. list_simplifier.
+    by apply interp_entails.
 Qed.

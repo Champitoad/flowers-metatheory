@@ -481,86 +481,86 @@ Inductive deriv : list form -> form -> Prop :=
 
 where "Γ ⟹ C" := (deriv Γ C).
 
-(** ** Cut-free derivations *)
+(** ** Structural-free derivations *)
 
-Reserved Infix "c⟹" (at level 90).
+Reserved Infix "s⟹" (at level 90).
 
-Inductive cderiv : list form -> form -> Prop :=
+Inductive sderiv : list form -> form -> Prop :=
 
 (** ** Identity *)
 
 | Sc_ax A Γ Γ' :
-  Γ ++ A :: Γ' c⟹ A
+  Γ ++ A :: Γ' s⟹ A
 
-(** ** Structural rules *)
+(** ** Contraction *)
 
 | Sc_contr_r A Γ Γ' Γ'' C :
-  Γ ++ A :: Γ' ++ A :: Γ'' c⟹ C -> 
-  Γ ++ Γ' ++ A :: Γ'' c⟹ C
+  Γ ++ A :: Γ' ++ A :: Γ'' s⟹ C -> 
+  Γ ++ Γ' ++ A :: Γ'' s⟹ C
 
 | Sc_contr_l A Γ Γ' Γ'' C :
-  Γ ++ A :: Γ' ++ A :: Γ'' c⟹ C -> 
-  Γ ++ A :: Γ' ++ Γ'' c⟹ C
+  Γ ++ A :: Γ' ++ A :: Γ'' s⟹ C -> 
+  Γ ++ A :: Γ' ++ Γ'' s⟹ C
 
 (** ** Right rules *)
 
 | Sc_R_true Γ :
-  Γ c⟹ ⊤
+  Γ s⟹ ⊤
 
 | Sc_R_and A B Γ :
-  Γ c⟹ A -> Γ c⟹ B ->
-  Γ c⟹ A ∧ B
+  Γ s⟹ A -> Γ s⟹ B ->
+  Γ s⟹ A ∧ B
 
 | Sc_R_or_l A B Γ :
-  Γ c⟹ A ->
-  Γ c⟹ A ∨ B
+  Γ s⟹ A ->
+  Γ s⟹ A ∨ B
 
 | Sc_R_or_r A B Γ :
-  Γ c⟹ B ->
-  Γ c⟹ A ∨ B
+  Γ s⟹ B ->
+  Γ s⟹ A ∨ B
 
 | Sc_R_imp A B Γ :
-  A :: Γ c⟹ B ->
-  Γ c⟹ A ⊃ B
+  A :: Γ s⟹ B ->
+  Γ s⟹ A ⊃ B
 
 | Sc_R_forall Γ C :
-  (fshift 1 0 <$> Γ) c⟹ C ->
-  Γ c⟹ #∀ C
+  (fshift 1 0 <$> Γ) s⟹ C ->
+  Γ s⟹ #∀ C
 
 | Sc_R_exists t Γ C :
-  Γ c⟹ funshift 1 0 (fsubst 0 (tshift 1 0 t) C) ->
-  Γ c⟹ #∃ C
+  Γ s⟹ funshift 1 0 (fsubst 0 (tshift 1 0 t) C) ->
+  Γ s⟹ #∃ C
 
 (** ** Left rules *)
 
 | Sc_L_true Γ Γ' C :
-  Γ ++ Γ' c⟹ C ->
-  Γ ++ ⊤ :: Γ' c⟹ C
+  Γ ++ Γ' s⟹ C ->
+  Γ ++ ⊤ :: Γ' s⟹ C
 
 | Sc_L_false Γ Γ' C :
-  Γ ++ ⊥ :: Γ' c⟹ C
+  Γ ++ ⊥ :: Γ' s⟹ C
 
 | Sc_L_and A B Γ Γ' C :
-  Γ ++ A :: B :: Γ' c⟹ C ->
-  Γ ++ (A ∧ B) :: Γ' c⟹ C
+  Γ ++ A :: B :: Γ' s⟹ C ->
+  Γ ++ (A ∧ B) :: Γ' s⟹ C
 
 | Sc_L_or A B Γ Γ' C :
-  Γ ++ A :: Γ' c⟹ C -> Γ ++ B :: Γ' c⟹ C ->
-  Γ ++ (A ∨ B) :: Γ' c⟹ C
+  Γ ++ A :: Γ' s⟹ C -> Γ ++ B :: Γ' s⟹ C ->
+  Γ ++ (A ∨ B) :: Γ' s⟹ C
 
 | Sc_L_imp A B Γ Γ' C :
-  Γ ++ Γ' c⟹ A -> Γ ++ B :: Γ' c⟹ C ->
-  Γ ++ (A ⊃ B) :: Γ' c⟹ C
+  Γ ++ Γ' s⟹ A -> Γ ++ B :: Γ' s⟹ C ->
+  Γ ++ (A ⊃ B) :: Γ' s⟹ C
 
 | Sc_L_forall A t Γ Γ' C :
-  Γ ++ funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ' c⟹ C ->
-  Γ ++ #∀ A :: Γ' c⟹ C
+  Γ ++ funshift 1 0 (fsubst 0 (tshift 1 0 t) A) :: Γ' s⟹ C ->
+  Γ ++ #∀ A :: Γ' s⟹ C
 
 | Sc_L_exists A Γ Γ' C :
-  (fshift 1 0 <$> Γ) ++ A :: (fshift 1 0 <$> Γ') c⟹ fshift 1 0 C ->
-  Γ ++ #∃ A :: Γ' c⟹ C
+  (fshift 1 0 <$> Γ) ++ A :: (fshift 1 0 <$> Γ') s⟹ fshift 1 0 C ->
+  Γ ++ #∃ A :: Γ' s⟹ C
 
-where "Γ c⟹ C" := (cderiv Γ C).
+where "Γ s⟹ C" := (sderiv Γ C).
 
 (** * Basic proof search *)
 
@@ -1395,6 +1395,26 @@ Proof.
 Qed.
 
 End Tautos.
+
+(** Admissibility of structural rules *)
+
+(* Here the structural rules comprise cut, weakening and exchange *)
+
+Lemma structural_admissibility Γ C :
+  Γ ⟹ C -> Γ s⟹ C.
+  (* It would be a lot of formalization effort, so we rely on the literature and
+    trust that our particular choices of presentation do not pose any problem. *)
+Admitted.
+
+(** Deduction theorem *)
+
+Lemma deduction A B :
+  [A] ⟹ B <-> [] ⟹ A ⊃ B.
+Proof.
+  split; move => H.
+  * isrch.
+  * by apply imp_intro_r_inv.
+Qed.
 
 (** * Fun facts *)
 
