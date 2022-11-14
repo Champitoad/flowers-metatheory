@@ -5,23 +5,21 @@ Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
 
 (** * Soundness *)
 
-Section Soundness.
-
 Import Flowers.Syntax.
 
 Reserved Notation "⌊ ϕ ⌋" (format "⌊ ϕ ⌋").
-Reserved Notation "⌊⌊ ϕ ⌋⌋" (format "⌊⌊ ϕ ⌋⌋").
+Reserved Notation "⌊[ ϕ ]⌋" (format "⌊[ ϕ ]⌋").
 
 Fixpoint flower_to_form (ϕ : flower) : form :=
   match ϕ with
   | Atom p args => FAtom p args
-  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ ⌊⌊Φ⌋⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ))
+  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ ⌊[Φ]⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ))
   end
 where "⌊ ϕ ⌋" := (flower_to_form ϕ)
-  and "⌊⌊ Φ ⌋⌋" := (flower_to_form <$> Φ).
+  and "⌊[ Φ ]⌋" := (flower_to_form <$> Φ).
 
 Definition interp (Φ : bouquet) :=
-  ⋀ ⌊⌊Φ⌋⌋.
+  ⋀ ⌊[Φ]⌋.
 
 Notation "⟦ Φ ⟧" := (interp Φ) (format "⟦ Φ ⟧").
 
@@ -43,8 +41,8 @@ Proof.
   rewrite Forall_equiv_map in IHγ.
   rewrite IHγ.
   rewrite -list_fmap_compose list_fmap_compose.
-  set f := λ δ : garden, fshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
-  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set f := λ δ : garden, fshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (shift n (c + m + k)) <$> Ψ.
   assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
@@ -78,8 +76,8 @@ Proof.
   rewrite Forall_equiv_map in IHγ.
   rewrite IHγ.
   rewrite -list_fmap_compose list_fmap_compose.
-  set f := λ δ : garden, funshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
-  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set f := λ δ : garden, funshift n (c + m) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (unshift n (c + m + k)) <$> Ψ.
   assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
@@ -113,8 +111,8 @@ Proof.
   rewrite Forall_equiv_map in IHγ.
   rewrite IHγ.
   rewrite -list_fmap_compose list_fmap_compose.
-  set f := λ δ : garden, fsubst (n + m) (Terms.tshift m 0 t) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋).
-  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊⌊Ψ⌋⌋.
+  set f := λ δ : garden, fsubst (n + m) (Terms.tshift m 0 t) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋).
+  set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋.
   set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (subst (n + m + k) (Terms.tshift (m + k) 0 t)) <$> Ψ.
   assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
@@ -162,7 +160,7 @@ Proof.
   repeat rewrite true_and.
   * rewrite bshift_zero. eqd.
   * repeat rewrite fmap_app And_app.
-    rewrite and_assoc [(⋀ ⌊⌊Ψ⌋⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⋀ ⌊⌊Ψ⌋⌋) ∧ _]and_assoc.
+    rewrite and_assoc [(⋀ ⌊[Ψ]⌋) ∧ _]and_comm and_assoc -[(_ ∧ ⋀ ⌊[Ψ]⌋) ∧ _]and_assoc.
     pose proof (IH := IHX Ψ); rewrite /interp/= in IH.
     rewrite IH; eqd.
   * repeat rewrite wpol_nforall; apply proper_nforall; auto.
@@ -204,9 +202,9 @@ Proof.
     repeat rewrite true_and.
     apply proper_nforall; auto.
     rewrite cons_app fmap_app. repeat rewrite And_app.
-    rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm.
-    repeat rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_assoc.
-    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ⊃ _]currying.
+    rewrite [⋀ ⌊[Ψ]⌋ ∧ _]and_comm.
+    repeat rewrite [⋀ ⌊[Φ]⌋ ∧ _]and_assoc.
+    repeat rewrite [_ ∧ ⋀ ⌊[Ψ]⌋ ⊃ _]currying.
     apply proper_imp; auto.
     rewrite [_ :: Δ']cons_app fmap_app.
     repeat rewrite Or_app.
@@ -225,18 +223,18 @@ Proof.
   * rewrite /interp. list_simplifier.
     repeat rewrite And_app.
     apply proper_and; auto.
-    rewrite [⋀ ⌊⌊Φ⌋⌋ ∧ _]and_comm.
-    rewrite -[_ ∧ ⋀ ⌊⌊Φ⌋⌋]and_assoc.
-    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_assoc.
+    rewrite [⋀ ⌊[Φ]⌋ ∧ _]and_comm.
+    rewrite -[_ ∧ ⋀ ⌊[Φ]⌋]and_assoc.
+    repeat rewrite [_ ∧ ⋀ ⌊[Ψ]⌋ ∧ _]and_assoc.
     apply proper_and; auto.
-    repeat rewrite [_ ∧ ⋀ ⌊⌊Ψ⌋⌋]and_comm.
+    repeat rewrite [_ ∧ ⋀ ⌊[Ψ]⌋]and_comm.
     by rewrite wpol.
   * rewrite /interp. list_simplifier.
     repeat rewrite And_app.
     apply proper_and; auto.
     repeat rewrite and_assoc.
     apply proper_and; auto.
-    rewrite [_ ∧ ⋀ ⌊⌊Φ'⌋⌋]and_comm.
+    rewrite [_ ∧ ⋀ ⌊[Φ']⌋]and_comm.
     rewrite -and_assoc -and_assoc.
     apply proper_and; auto.
     by rewrite wpol.
@@ -262,8 +260,8 @@ Proof.
   apply Forall_equiv_map.
   apply equiv_Forall. move => [k Θ] /=.
   assert (H :
-    fshift k 0 ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ') ⟺
-    ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> (gshift k 0 <$> Δ'))).
+    fshift k 0 ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ') ⟺
+    ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> (gshift k 0 <$> Δ'))).
   { rewrite fshift_Or.
     apply proper_Or.
     rewrite -list_fmap_compose.
@@ -289,10 +287,10 @@ Proof.
   rewrite fmap_singl And_singl /= true_imp_l false_or.
   rewrite [m#∃ _ ∧ _]and_comm and_assoc currying.
   rewrite nexists_intro_l.
-  rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm and_assoc [_ ∧ ⋀ ⌊⌊Ψ⌋⌋ ⊃ _]currying.
+  rewrite [⋀ ⌊[Ψ]⌋ ∧ _]and_comm and_assoc [_ ∧ ⋀ ⌊[Ψ]⌋ ⊃ _]currying.
   assert (H :
-    ⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ ⋀ ⌊⌊shift m 0 <$> Φ'⌋⌋ ⟺
-    fshift m 0 (⋀ ⌊⌊Φ⌋⌋ ∧ ⋀ ⌊⌊Φ'⌋⌋)).
+    ⋀ ⌊[shift m 0 <$> Φ]⌋ ∧ ⋀ ⌊[shift m 0 <$> Φ']⌋ ⟺
+    fshift m 0 (⋀ ⌊[Φ]⌋ ∧ ⋀ ⌊[Φ']⌋)).
   { rewrite /= fshift_And fshift_And.
     apply proper_and;
     apply proper_And; rewrite -list_fmap_compose;
@@ -326,10 +324,10 @@ Proof.
   repeat rewrite And_app. rewrite And_singl.
   rewrite -nexists_add.
   apply proper_nexists; auto.
-  rewrite [⋀ ⌊⌊Ψ⌋⌋ ∧ _]and_comm [⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ _]and_assoc.
+  rewrite [⋀ ⌊[Ψ]⌋ ∧ _]and_comm [⋀ ⌊[shift m 0 <$> Φ]⌋ ∧ _]and_assoc.
   assert (H :
-    ⋀ ⌊⌊shift m 0 <$> Φ⌋⌋ ∧ ⋀ ⌊⌊shift m 0 <$> Φ'⌋⌋ ⟺
-    fshift m 0 (⋀ ⌊⌊Φ⌋⌋ ∧ ⋀ ⌊⌊Φ'⌋⌋)).
+    ⋀ ⌊[shift m 0 <$> Φ]⌋ ∧ ⋀ ⌊[shift m 0 <$> Φ']⌋ ⟺
+    fshift m 0 (⋀ ⌊[Φ]⌋ ∧ ⋀ ⌊[Φ']⌋)).
   { rewrite /= fshift_And fshift_And.
     apply proper_and;
     apply proper_And; rewrite -list_fmap_compose;
@@ -362,11 +360,11 @@ Proof.
   eqd.
   * rewrite nforall_one nforall_add.
     assert (H : 1 + n = S n); first lia; rewrite H; clear H.
-    set A := ⋀ ⌊⌊Φ⌋⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$> Δ).
+    set A := ⋀ ⌊[Φ]⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ).
     assert (H :
       funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) A) ⟺
-      ⋀ ⌊⌊unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)⌋⌋
-       ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊⌊Ψ⌋⌋) <$>
+      ⋀ ⌊[unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)]⌋
+       ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$>
             (gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)))).
     { rewrite /A/=.
       rewrite fsubst_And funshift_And.
@@ -409,8 +407,8 @@ Proof.
   split. pright. isrch. rewrite false_or.
   rewrite nexists_one nexists_add -[1 + n]/(S n).
   assert (H :
-    funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) ⋀ ⌊⌊Φ⌋⌋) ⟺
-    ⋀ ⌊⌊unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)⌋⌋).
+    funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) ⋀ ⌊[Φ]⌋) ⟺
+    ⋀ ⌊[unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)]⌋).
   { rewrite fsubst_And funshift_And.
     apply proper_And.
     do 2 rewrite -list_fmap_compose.
@@ -467,11 +465,7 @@ Proof.
   apply grounding. by apply local_soundness.
 Qed.
 
-End Soundness.
-
 (** * Completeness *)
-
-Section Completeness.
 
 Reserved Notation "⌈ A ⌉" (format "⌈ A ⌉", at level 0).
 
@@ -987,29 +981,29 @@ Proof.
   reflexivity.
 Qed.
 
-End Completeness.
-
 (** * Deduction *)
+
+Lemma coepis Φ :
+  Φ ~>* ⊢ [0 ⋅ Φ].
+Proof.
+  estep. rself.
+  pose proof (Hstep := R_copolepis [] Φ 0 (Planter [] □ [])); list_simplifier.
+  apply Hstep.
+  pose proof (Hp := P_wind_l [] □ [] [] []); list_simplifier.
+  exact Hp.
+  reflexivity.
+Qed.
 
 Definition entails (Φ Ψ : bouquet) := 0 ⋅ Φ ⊢ [0 ⋅ Ψ] ~>* [].
 
 Infix "===>" := entails (at level 90).
 
-(* Theorem deduction Φ Ψ :
+Theorem deduction Φ Ψ :
   Φ ===> Ψ <-> [] ===> 0 ⋅ Φ ⊢ [0 ⋅ Ψ].
 Proof.
   split; rewrite /entails; move => H.
-
   * rctxmH [0;1] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-
-  * rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
-
-    rscopolm [1;0;0] 0 0 (@nil flower) Φ (@nil flower).
-    rcoepispet 0 0 (@nil flower) (@nil flower) (@nil garden) (@nil garden).
-
-    rctxmH [0;1;0] H.
-    rpetm (@nil nat) (@nil garden) (@nil garden).
-    reflexivity.
-Qed. *)
+  * etransitivity. eapply coepis. done.
+Qed.
