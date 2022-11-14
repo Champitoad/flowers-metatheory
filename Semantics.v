@@ -268,19 +268,6 @@ Proof.
   intros. by apply fshift_zero.
 Qed.
 
-Lemma fshift_succ : ∀ A c n,
-  fshift (S n) c A = fshift 1 c (fshift n c A).
-Proof.
-  induction A using form_induction; intros c n; simpl; auto.
-  * pose proof (H := eq_map (tshift (S n) c) _ args (tshift_succ c n)).
-    by rewrite H list_fmap_compose.
-  * f_equal; done.
-  * f_equal; done.
-  * f_equal; done.
-  * f_equal. by rewrite IHA.
-  * f_equal. by rewrite IHA.
-Qed.
-
 Lemma fshift_add : ∀ A c n m,
   fshift (n + m) c A = fshift n c (fshift m c A).
 Proof.
@@ -292,6 +279,14 @@ Proof.
   * f_equal; done.
   * f_equal. by rewrite IHA.
   * f_equal. by rewrite IHA.
+Qed.
+
+Lemma fshift_succ : ∀ A c n,
+  fshift (S n) c A = fshift 1 c (fshift n c A).
+Proof.
+  intros.
+  rewrite -Nat.add_1_l.
+  apply fshift_add.
 Qed.
 
 Lemma fshift_comm A c n m :
@@ -352,7 +347,10 @@ Proof.
   induction A using form_induction; intros; simpl; auto;
   try by rewrite IHA1 IHA2.
   * rewrite -list_fmap_compose.
-    rewrite (eq_map _ id). apply tunshift_tshift.
+    rewrite (eq_map _ id).
+    move => t.
+    pose proof (H := tunshift_tshift 0 n c t).
+    by rewrite tunshift_zero /= in H.
     by rewrite map_id_ext.
   * by rewrite IHA.
   * by rewrite IHA.

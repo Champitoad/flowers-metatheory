@@ -155,22 +155,62 @@ Proof.
   intros. by apply shift_zero.
 Qed.
 
+Lemma unshift_zero : ∀ (ϕ : flower) c,
+  unshift 0 c ϕ = ϕ.
+Proof.
+  elim/flower_induction => [p args |[m Φ] Δ IHγ IHΔ] c /=.
+
+  * pose proof (H := eq_map (tunshift 0 c) id args (tunshift_zero c)).
+    by rewrite H list_fmap_id.
+
+  * rewrite Forall_forall in IHγ; specialize (IHγ (c + m)).
+    apply Forall_eq_map in IHγ; rewrite IHγ map_id_ext.
+
+    elim: {Δ} IHΔ => [|[n Ψ] Δ IHΨ IHΔ IH] //=; inv IH.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + m + n)).
+    apply Forall_eq_map in IHΨ; rewrite IHΨ map_id_ext.
+    by repeat f_equal.
+Qed.
+
+Lemma unshift_shift : forall (ϕ : flower) m n c, 
+  unshift (m + n) c (shift n c ϕ) = unshift m c ϕ.
+Proof.
+  elim/flower_induction => [p args |[k Φ] Δ IHγ IHΔ] m n c /=.
+
+  * pose proof (H := eq_map _ _ args (tunshift_tshift m n c)).
+    f_equal. rewrite -list_fmap_compose.
+    by rewrite H.
+
+  * rewrite Forall_forall in IHγ; specialize (IHγ m);
+    rewrite Forall_forall in IHγ; specialize (IHγ n);
+    rewrite Forall_forall in IHγ; specialize (IHγ (c + k)).
+    apply Forall_eq_map in IHγ.
+    rewrite -list_fmap_compose IHγ.
+
+    elim: {Δ} IHΔ => [|[l Ψ] Δ IHΨ IHΔ IH] //.
+
+    rewrite Forall_forall in IHΨ; specialize (IHΨ m);
+    rewrite Forall_forall in IHΨ; specialize (IHΨ n);
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (c + k + l));
+    apply Forall_eq_map in IHΨ. rewrite list_fmap_compose in IHΨ.
+    cbn. f_equal. rewrite IHΨ.
+
+    inv IH.
+Qed.
+
 Lemma bunshift_zero : ∀ (Φ : bouquet) c,
   unshift 0 c <$> Φ = Φ.
 Proof.
   intros. rewrite -{2}[Φ]map_id_ext. apply eq_map.
-  (* intros. by apply unshift_zero. *)
-(* Qed. *)
-Admitted.
+  intros. by apply unshift_zero.
+Qed.
 
-Lemma bunshift_add : ∀ (Φ : bouquet) n m c,
-  unshift (n + m) c <$> Φ = unshift n c <$> (unshift m c <$> Φ).
+Lemma bunshift_shift m n c (Φ : bouquet) :
+  unshift (m + n) c <$> (shift n c <$> Φ) = unshift m c <$> Φ.
 Proof.
-Admitted.
-
-Lemma bunshift_shift n c (Φ : bouquet) :
-  unshift n c <$> (shift n c <$> Φ) = Φ.
-Admitted.
+  intros. rewrite -list_fmap_compose. apply eq_map.
+  intros. by apply unshift_shift.
+Qed.
 
 Lemma gshift_zero : ∀ (γ : garden) c,
   gshift 0 c γ = γ.
@@ -453,7 +493,7 @@ Proof.
   move => [Y0 [Z [Hpol Hcomp]]]. subst.
   exists Y0. exists (Z ⪡ Y).
   split; [> |by rewrite comp_assoc].
-  rewrite bunshift_add bunshift_shift.
+  rewrite bunshift_shift.
   by apply pollin_comp_out.
 Qed.
 
@@ -942,28 +982,19 @@ Ltac repispis n m Φl Φr :=
       clear H
   end.
 
-Ltac rrep :=
-  eapply rtc_l; [>
-    rself;
-    match goal with
-    | |- [?n ⋅ ?Φl ++ [⊢ ?Ψs] ++ ?Φr ⊢ ?Δ] ⇀ _ =>
-        let H := fresh "H" in
-        pose proof (H := R_rep Ψs n Φl Φr Δ);
-        list_simplifier;
-        eapply H
-    end
-  |].
+Ltac rrep Φl Φr :=
+  match goal with
+  | |- [?n ⋅ _ ⊢ ?Δ] ~>* _ =>
+      let H := fresh "H" in
+      epose proof (H := R_rep _ n Φl Φr Δ);
+      list_simplifier;
+      etransitivity; [> eapply rtc_once; rself; eapply H |];
+      clear H
+  end.
 
 Ltac rpet Δ Δ' :=
   apply (R_pet _ Δ Δ').
 
 Ltac rpetm p Δ Δ' :=
   rcstepm p (@nil flower); [> rpet Δ Δ' |].
-
-Open Scope string_scope.
-
-Example deriv_contraction :
-  [Atom "a" []; Atom "b" []] ~>* [Atom "a" []; Atom "b" []; Atom "b" []].
-Proof.
-  apply rtc_once.
-Admitted.
+  

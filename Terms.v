@@ -97,20 +97,6 @@ Proof.
     by rewrite list_fmap_id in IH.
 Qed.
 
-Lemma tshift_succ c n : ∀ t,
-  tshift (S n) c t = tshift 1 c (tshift n c t).
-Proof.
-  induction t as [|?? IH] using term_induction; simpl.
-  * destruct (n0 <? c) eqn:Heqb.
-    by rewrite Heqb.
-    assert (H : n0 + n <? c = false).
-    { rewrite Nat.ltb_nlt in Heqb.
-      apply Nat.ltb_nlt. lia. }
-    by rewrite H Nat.add_1_r Nat.add_succ_r.
-  * f_equal. rewrite Forall_eq_map in IH.
-    by rewrite (list_fmap_compose (tshift n c)) in IH.
-Qed.
-
 Lemma tshift_add c n m : ∀ t,
   tshift (n + m) c t = tshift n c (tshift m c t).
 Proof.
@@ -130,6 +116,15 @@ Lemma tshift_comm c n m t :
   tshift n c (tshift m c t) = tshift m c (tshift n c t).
 Proof.
   by rewrite -tshift_add Nat.add_comm tshift_add.
+Qed.
+
+Lemma tunshift_zero c : ∀ t,
+  tunshift 0 c t = t.
+Proof.
+  induction t as [|?? IH] using term_induction; simpl.
+  * destruct (n <? c); auto. by rewrite Nat.sub_0_r.
+  * f_equal. rewrite Forall_eq_map in IH.
+    by rewrite list_fmap_id in IH.
 Qed.
 
 Lemma tsubst_tshift c m t :
@@ -243,16 +238,16 @@ Proof.
     by rewrite -list_fmap_compose.
 Qed.
 
-Lemma tunshift_tshift m c t :
-  tunshift m c (tshift m c t) = t.
+Lemma tunshift_tshift m n c t :
+  tunshift (m + n) c (tshift n c t) = tunshift m c t.
 Proof.
   induction t using term_induction; simpl.
   * f_equal.
-    destruct (n <? c) eqn:?. by rewrite Heqb.
-    assert (n + m <? c = false).
+    destruct (n0 <? c) eqn:?. by rewrite Heqb.
+    assert (n0 + n <? c = false).
     { apply Nat.ltb_nlt.
       apply Nat.ltb_nlt in Heqb. lia. }
     rewrite H. lia.
   * apply Forall_eq_map in H. rewrite -list_fmap_compose.
-    rewrite map_id_ext in H. by rewrite H.
+    by rewrite H.
 Qed.
