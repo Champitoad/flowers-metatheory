@@ -674,6 +674,29 @@ Proof.
   * rewrite Hperm in HD. by apply H.
 Qed.
 
+Lemma move_cons_right {A} (l l' : list A) (x : A) :
+  l ++ x :: l' ≡ₚ (l ++ l') ++ [x].
+Proof.
+  by solve_Permutation.
+Qed.
+
+Lemma subctx_petal A n Φl Φr Δ Δ' :
+  [A] ⪽ Petal (n ⋅ Φl ++ ⌈A⌉ ++ Φr) Δ 0 □ Δ'.
+Proof.
+  move => D HD. inv HD; [> |inv H1].
+  exists 0. split; [> by apply is_shifted_zero |].
+  red. rewrite bunshift_zero.
+  exists □. exists (Petal (n ⋅ Φl ++ ⌈A⌉ ++ Φr) Δ 0 □ Δ').
+  split; auto.
+  epose proof (Hp := P_self _ □ _ Φl Φr _ 0 _).
+  eapply Hp.
+Qed.
+
+Ltac subctxpet Φl Φr Δ Δ' :=
+  let Hs := fresh "Hs" in
+  epose proof (Hs := subctx_petal _ _ Φl Φr Δ Δ');
+  list_simplifier; eapply Hs.
+
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
 Theorem full_completeness Γ C :
@@ -699,6 +722,16 @@ Proof.
   | A t Γ Γ' C _ IH1
   | A t Γ Γ' C IH1
   ] X H.
+
+  Ltac applyIH IH X X0 :=
+    specialize (IH (X ⪡ X0));
+    repeat rewrite -fill_comp /= in IH;
+    etransitivity; [> apply IH |].
+
+  Ltac bypet Δ Δ' :=
+    repeat rewrite fill_comp; eapply cstep_congr;
+    rpetm (@nil nat) Δ Δ';
+    reflexivity.
 
   Ltac pull_hyp H A Γ Γ' :=
     assert (HA : A ∈ (Γ ++ A :: Γ')); [> solve_elem_of_list |];
@@ -738,67 +771,32 @@ Proof.
   * reflexivity.
 
   (* R∧ *)
-  * set X0 := Planter [] □ ⌈B⌉.
-    specialize (IH1 (X ⪡ X0)).
-    repeat rewrite -fill_comp /= in IH1.
-    etransitivity; [> apply IH1 |].
-    - subctxout H.
-    - by apply IH2.
+  * applyIH IH1 X (Planter [] □ ⌈B⌉).
+    subctxout H.
+    by apply IH2.
 
   (* R∨₁ *)
-  (* * specialize (IH1 (X ⪡ Petal ∅ [] 0 □ [0 ⋅ shift (bv X) 0 <$> ⌈B⌉])).
-    rewrite /fill_ca in IH1 |- *.
-    repeat rewrite -fill_comp in IH1.
-    rewrite bv_comp /= Nat.add_0_r in IH1.
-    rewrite fmap_singl.
-    etransitivity; [> apply IH1 |].
-    - move => D HD. by apply assum_ca_comp_out.
-    - apply cstep_congr.
-      rpetm (@nil nat) (@nil garden) [0 ⋅ shift (bv X) 0 <$> ⌈B⌉].
-      reflexivity. *)
-  * admit.
+  * applyIH IH1 X (Petal ∅ [] 0 □ [0 ⋅ ⌈B⌉]).
+    subctxout H.
+    bypet (@nil garden) [0 ⋅ ⌈B⌉].
 
   (* R∨₁ *)
-  (* * specialize (IH1 (X ⪡ Petal ∅ [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] 0 □ [])).
-    rewrite /fill_ca in IH1 |- *.
-    repeat rewrite -fill_comp in IH1.
-    rewrite bv_comp /= Nat.add_0_r in IH1.
-    rewrite fmap_singl.
-    etransitivity; [> apply IH1 |].
-    - move => D HD. by apply assum_ca_comp_out.
-    - apply cstep_congr.
-      rpetm (@nil nat) [0 ⋅ shift (bv X) 0 <$> ⌈A⌉] (@nil garden).
-      reflexivity. *)
-  * admit.
+  * applyIH IH1 X (Petal ∅ [0 ⋅ ⌈A⌉] 0 □ []).
+    subctxout H.
+    bypet [0 ⋅ ⌈A⌉] (@nil garden).
 
   (* R⊃ *) 
-  * set X0 := Petal (0 ⋅ ⌈A⌉) [] 0 □ [].
-    specialize (IH1 (X ⪡ X0)).
-    repeat rewrite -fill_comp /= in IH1.
-    etransitivity; [> apply IH1 |].
-    - rewrite cons_app. apply subctx_app.
-      + apply subctx_comp_in.
-        move => D HD. inv HD; [> |inv H2].
-        exists 0. split; [> apply is_shifted_zero |].
-        red. rewrite bunshift_zero.
-        exists □. exists X0.
-        split; [> |reflexivity]. rewrite /X0.
-        epose proof (Hp := P_self _ □ _ [] [] _ 0); list_simplifier.
-        eapply Hp.
-      + subctxout H.
-    - apply cstep_congr.
-      rpetm (@nil nat) (@nil garden) (@nil garden).
-      reflexivity.
+  * applyIH IH1 X (Petal (0 ⋅ ⌈A⌉) [] 0 □ []).
+    { rewrite cons_app. apply subctx_app.
+      * apply subctx_comp_in.
+        subctxpet (@nil flower) (@nil flower) (@nil garden) (@nil garden).
+      * subctxout H. }
+    bypet (@nil garden) (@nil garden).
 
   (* R∀ *)
-  * set X0 := Petal (1 ⋅ []) [] 0 □ [].
-    specialize (IH1 (X ⪡ X0)).
-    repeat rewrite -fill_comp /= in IH1.
-    etransitivity; [> apply IH1 |].
-    - subctxout H.
-    - apply cstep_congr.
-      rpetm (@nil nat) (@nil garden) (@nil garden).
-      reflexivity.
+  * applyIH IH1 X (Petal (1 ⋅ []) [] 0 □ []).
+    subctxout H.
+    bypet (@nil garden) (@nil garden).
 
   (* R∃ *)
   * admit.
@@ -818,32 +816,20 @@ Proof.
   (* L⊃ *)
   * pull_hyp H (A ⊃ B) Γ Γ'.
 
-    set X1 := Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉].
-    specialize (IH1 (Y ⪡ Z ⪡ X1)).
-    repeat rewrite -fill_comp /= in IH1.
-    etransitivity; [> apply IH1; subctxout Hsubctx |].
+    applyIH IH1 (Y ⪡ Z) (Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉]).
+    { subctxout Hsubctx. }
 
     etransitivity. rewrite fill_comp. eapply cstep_congr.
     repispis 0 0 (@nil flower) (@nil flower). reflexivity.
 
-    set X2 := Petal (0 ⋅ ⌈B⌉) [] 0 □ [].
-    specialize (IH2 (Y ⪡ Z ⪡ X2)).
-    repeat rewrite -fill_comp /= in IH2 |- *.
-    etransitivity; [> apply IH2 |].
-    { assert (Hperm : Γ ++ B :: Γ' ≡ₚ (Γ ++ Γ') ++ [B]). { solve_Permutation. }
-      rewrite Hperm. apply subctx_app.
+    rewrite -fill_comp.
+    applyIH IH2 (Y ⪡ Z) (Petal (0 ⋅ ⌈B⌉) [] 0 □ []).
+    { rewrite move_cons_right. apply subctx_app.
       subctxout Hsubctx.
-      apply subctx_comp_in. rewrite /X2.
-      red. move => D HD. inv HD.
-      exists 0. split; [> apply is_shifted_zero |].
-      red. exists □. exists X2. split; auto.
-      epose proof (Hw := P_self _ □ 0 [] [] [] 0 []); list_simplifier.
-      rewrite bunshift_zero. eapply Hw.
-      inv H2. }
+      apply subctx_comp_in.
+      subctxpet (@nil flower) (@nil flower) (@nil garden) (@nil garden). }
 
-    repeat rewrite fill_comp. eapply cstep_congr.
-    rpetm (@nil nat) (@nil garden) (@nil garden).
-    reflexivity.
+    bypet (@nil garden) (@nil garden).
 
   (* L∀ *)
   * pull_hyp H (#∀ A) Γ Γ'.
@@ -855,8 +841,20 @@ Proof.
       erewrite Hctx. eapply R_ctx.
       epose proof (Hipis := R_ipis 0 t 0 _ _).
       eapply Hipis. lia. }
+    rewrite -fill_comp/= Terms.tshift_zero subst_fsubst unshift_funshift.
 
-    admit.
+    etransitivity. eapply cstep_congr.
+    repispis 0 0 (@nil flower) [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]]. reflexivity.
+
+    set iA := funshift 1 0 (fsubst 0 (Terms.tshift 1 0 t) A) in IH1 |- *.
+    set X0 := Petal (0 ⋅ ⌈iA⌉ ++ [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]]) [] 0 □ [].
+    rewrite -fill_comp. applyIH IH1 (Y ⪡ Z) X0.
+    { rewrite move_cons_right. apply subctx_app.
+      subctxout Hsubctx.
+      apply subctx_comp_in.
+      subctxpet (@nil flower) [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]] (@nil garden) (@nil garden). }
+
+    bypet (@nil garden) (@nil garden).
     
   (* L∃ *)
   * admit.
