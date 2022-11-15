@@ -264,6 +264,17 @@ Proof.
   by elim.
 Qed.
 
+Lemma Forall2_equiv_map_bind {A B} {e : Equiv (list B)} :
+  ∀ (l : list A) (f g : A -> list B),
+  Forall2 e (f <$> l) (g <$> l) ->
+  e (l ≫= f) (l ≫= g).
+Proof.
+Admitted.
+
+Lemma list_bind_singl {A} (l : list A) :
+  l ≫= (λ x, [x]) = l.
+Admitted.
+
 Lemma Forall_eq_map {A B} (l : list A) (f g : A -> B) :
   (Forall (fun x => f x = g x) l) <->
   f <$> l = g <$> l.

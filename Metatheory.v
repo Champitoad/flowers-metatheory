@@ -1011,6 +1011,14 @@ Proof.
   etransitivity; eauto.
 Qed.
 
+Definition pflower n Φ Ψ := n ⋅ Φ ⊢ [0 ⋅ Ψ].
+
+Add Morphism pflower with signature
+  eq ==> eqprov ==> eqprov ==> eqprov
+  as proper_pflower_eqprov.
+Proof.
+Admitted.
+
 Lemma cstep_gstep Φ Ψ :
   Φ ~>* Ψ -> Φ ≈>* Ψ.
 Proof.
@@ -1076,13 +1084,36 @@ Qed.
     completeness proof entails admissibility of any imaginable sound rule,
     like the fall (weakening) rule or permutations for gardens and petals. *)
 
+Lemma finterp_interp Φ :
+  ⌈⟦Φ⟧⌉ = ⌈[⌊[Φ]⌋]⌉.
+Proof.
+  by rewrite /interp/= finterp_And.
+Qed.
+
+Lemma finterp_interp_map (Φ : bouquet) :
+  ⌈⟦Φ⟧⌉ = ϕ ← Φ; ⌈⌊ϕ⌋⌉.
+Proof.
+Admitted.
+
+Lemma finterp_nforall_imp n A B :
+  ⌈n#∀ (A ⊃ B)⌉ ≡ n ⋅ ⌈A⌉ ⊢ [0 ⋅ ⌈B⌉].
+Admitted.
+
 Lemma flower_to_form_weak_iso : forall (ϕ : flower),
-  ⌈⌊ϕ⌋⌉ ≡ ϕ.
+  ⌈⌊ϕ⌋⌉ ≡ [ϕ].
 Proof.
   elim/flower_induction => [p args |[n Φ] Δ IHγ IHΔ] //=.
-  elim: n => [|n IHn] /=.
-  * admit.
-  * admit.
+  rewrite finterp_nforall_imp.
+  apply Forall_equiv_map in IHγ.
+  apply Forall2_equiv_map_bind in IHγ.
+  rewrite finterp_interp_map.
+  set Ψr := (x in _ ⊢ [0 ⋅ x] ≡ _).
+  pose proof (Hproper := proper_pflower_eqprov n n eq_refl _ _ IHγ Ψr Ψr
+                         (Equivalence_Reflexive Ψr)).
+  rewrite Hproper /pflower list_bind_singl /Ψr.
+  clear IHγ Hproper Ψr.
+
+  elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH] /=. admit.
 Admitted.
 
 Lemma interp_weak_iso : forall (Φ : bouquet),
@@ -1102,12 +1133,6 @@ Add Morphism prov with signature
   eqprov ==> iff
   as proper_prov_eqprov.
 Admitted.
-
-Lemma finterp_interp Φ :
-  ⌈⟦Φ⟧⌉ = ⌈[⌊[Φ]⌋]⌉.
-Proof.
-  by rewrite /interp/= finterp_And.
-Qed.
 
 Lemma interp_entails Φ Ψ :
   ⌈⟦Φ⟧⌉ |~ ⌈⟦Ψ⟧⌉ ->
