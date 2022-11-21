@@ -466,7 +466,7 @@ Qed.
 
 (** Soundness of structural rules *)
 
-Lemma grow (P : pctx) Φ :
+Lemma grow : ∀ (P : pctx) Φ,
   [⟦P ⋖ Φ⟧] ⟹ ⟦P ⋖ []⟧.
 Admitted.
 
@@ -990,6 +990,8 @@ Infix "≡" := eqprov.
 Definition sprov Φ := Φ ≈>* [].
 Definition eqsprov Φ Ψ := sprov Φ <-> sprov Ψ.
 
+Infix "≣" := eqsprov (at level 90).
+
 #[export] Instance equiv_eqprov : Equivalence eqprov.
 Proof.
   econs; red; rewrite /eqprov; intros.
@@ -1011,7 +1013,7 @@ Lemma cstep_gstep Φ Ψ :
 Proof.
   elim => [Φ1 |Φ1 Φ2 Φ3 Hstep _ IH]. reflexivity.
   apply (rtc_l _ _ Φ2).
-  { case: Hstep => {Φ Ψ} [X Φ Ψ Hstep]. by apply Rg_ctx. }
+  { case: Hstep => {Φ Ψ} [X Φ Ψ Hstep]. by apply Rs_ctx. }
   exact IH.
 Qed.
 
@@ -1025,6 +1027,49 @@ Lemma entails_sentails Φ Ψ :
   Φ |~ Ψ -> Φ |≈ Ψ.
 Proof.
   by apply cstep_gstep.
+Qed.
+
+Definition eqentails Φ Ψ := (Φ |~ Ψ) /\ (Ψ |~ Φ).
+Definition eqsentails Φ Ψ := (Φ |≈ Ψ) /\ (Ψ |≈ Φ).
+
+Infix "~||~" := eqentails (at level 90).
+Infix "≈||≈" := eqsentails (at level 90).
+
+Lemma cut Φ Ψ :
+  Ψ ≈>* Φ ++ [0 ⋅ Φ ⊢ [0 ⋅ Ψ]].
+Proof.
+  estep.
+  apply (Rs_grow (PPlanter [] PHole Ψ) Φ). cbn.
+  estep.
+  epose proof (Hc := Rs_ctx (PPlanter Φ PHole []) Ψ _).
+  list_simplifier. eapply Hc. eapply R_coepis.
+  estep.
+  epose proof (Hc := Rs_ctx □ _ _).
+  list_simplifier. eapply Hc.
+
+  pose proof (Hp := R_copol Φ 0 (Planter Φ (Pistil 0 □ [0 ⋅ Ψ]) [])).
+  list_simplifier. apply Hp.
+  epose proof (Hpol := P_wind_r Φ (Pistil _ □ _) [] [] []).
+  list_simplifier. rewrite Nat.add_0_r in Hpol. eapply Hpol.
+  rewrite bshift_zero. reflexivity.
+Qed.
+
+Lemma eqsentails_eqsprov Φ Ψ :
+  Φ ≈||≈ Ψ -> Φ ≣ Ψ.
+Proof.
+  move => [H1 H2].
+  repeat red. rewrite /sprov. split; move => H.
+  repeat red in H1, H2.
+  * etransitivity. eapply (cut Φ).
+    etransitivity.
+    epose proof (Hc := sstep_congr (PPlanter Φ PHole []) [0 ⋅ Φ ⊢ [0 ⋅ Ψ]] _).
+    list_simplifier. eapply Hc. eapply H1.
+    list_simplifier. apply H.
+  * etransitivity. eapply (cut Ψ).
+    etransitivity.
+    epose proof (Hc := sstep_congr (PPlanter Ψ PHole []) [0 ⋅ Ψ ⊢ [0 ⋅ Φ]] _).
+    list_simplifier. eapply Hc. eapply H2.
+    list_simplifier. apply H.
 Qed.
 
 (* Global Instance sentails_po : PreOrder sentails.

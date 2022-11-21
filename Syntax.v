@@ -569,6 +569,40 @@ with nctx_to_ctx (N : nctx) : ctx :=
 Coercion pctx_to_ctx : pctx >-> ctx.
 Coercion nctx_to_ctx : nctx >-> ctx.
 
+Scheme pctx_nctx_ind := Induction for pctx Sort Prop
+  with nctx_pctx_ind := Induction for nctx Sort Prop.
+
+Reserved Infix "⪡p" (at level 15).
+Reserved Infix "⪡n" (at level 15).
+
+Fixpoint pcomp (P : pctx) (Q : pctx) : pctx :=
+  match P with
+  | PHole => Q
+  | PPlanter Φ P Φ' => PPlanter Φ (P ⪡p Q) Φ'
+  | PPistil n N Δ => PPistil n (N ⪡n Q) Δ
+  | PPetal γ Δ n P Δ' => PPetal γ Δ n (P ⪡p Q) Δ'
+  end
+with ncomp (N : nctx) (Q : pctx) : nctx :=
+  match N with
+  | NPistil n P Δ => NPistil n (P ⪡p Q) Δ
+  end
+where "P ⪡p Q" := (pcomp P Q)
+  and "N ⪡n Q" := (ncomp N Q).
+
+Section PComp.
+
+Let P0 P := forall Q, pctx_to_ctx (P ⪡p Q) = P ⪡ Q.
+Let N0 N := forall Q, nctx_to_ctx (N ⪡n Q) = N ⪡ Q.
+
+Lemma pcomp_comp : forall P, P0 P.
+Proof.
+  apply: (pctx_nctx_ind P0 N0) => //;
+  try rewrite /P0/=; try rewrite /N0/=;
+  intros; by rewrite H.
+Qed.
+
+End PComp.
+
 (** ** Contextual closure + structural rules *)
 
 Reserved Infix "≈>" (at level 80).
@@ -577,11 +611,11 @@ Inductive sstep : bouquet -> bouquet -> Prop :=
 
 (** *** Congruence *)
 
-| Rg_ctx (X : ctx) (Φ Ψ : bouquet) :
+| Rs_ctx (X : ctx) (Φ Ψ : bouquet) :
   Φ ⇀ Ψ ->
   X ⋖ Φ ≈> X ⋖ Ψ
 
-| Rg_grow (P : pctx) (Φ : bouquet) :
+| Rs_grow (P : pctx) (Φ : bouquet) :
   P ⋖ [] ≈> P ⋖ Φ
 
 where "Φ ≈> Ψ" := (sstep Φ Ψ).
@@ -591,6 +625,19 @@ where "Φ ≈> Ψ" := (sstep Φ Ψ).
 Infix "≈>*" := (rtc sstep) (at level 80).
 
 Notation "Φ <≈> Ψ" := (Φ ≈>* Ψ /\ Ψ ≈>* Φ) (at level 80).
+
+Lemma sstep_congr (P : pctx) Φ Ψ :
+  Φ ≈>* Ψ ->
+  P ⋖ Φ ≈>* P ⋖ Ψ.
+Proof.
+  elim {Φ Ψ} => [Φ |Φ Ψ Θ Hstep H IH]; [> reflexivity |].
+  apply (rtc_l _ _ (P ⋖ Ψ)); [> |by apply IH].
+  elim: Hstep => {Φ} [X0 Φ0 Ψ0 |P0 Φ].
+  * rewrite fill_comp fill_comp.
+    by apply (Rs_ctx (P ⪡ X0) Φ0 Ψ0).
+  * rewrite fill_comp fill_comp -pcomp_comp.
+    by apply (Rs_grow (P ⪡p P0) Φ).
+Qed.
 
 (** * Basic proof search *)
 
