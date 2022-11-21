@@ -13,7 +13,7 @@ Reserved Notation "⌊[ ϕ ]⌋" (format "⌊[ ϕ ]⌋").
 Fixpoint flower_to_form (ϕ : flower) : form :=
   match ϕ with
   | Atom p args => FAtom p args
-  | n ⋅ Φ ⊢ Δ => n#∀ (⋀ ⌊[Φ]⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ))
+  | n ⋅ Φ ⫐ Δ => n#∀ (⋀ ⌊[Φ]⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ))
   end
 where "⌊ ϕ ⌋" := (flower_to_form ϕ)
   and "⌊[ Φ ]⌋" := (flower_to_form <$> Φ).
@@ -241,8 +241,8 @@ Proof.
 Qed.
 
 Lemma reproduction (Δ : list garden) n (Φ Φ' : bouquet) (Δ' : list garden) :
-  ⟦n ⋅ Φ ++ [⊢ Δ] ++ Φ' ⊢ Δ'⟧ ⟺
-  ⟦n ⋅ Φ ++ Φ' ⊢ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⊢ gshift m 0 <$> Δ') <$> Δ]⟧.
+  ⟦n ⋅ Φ ++ [⫐ Δ] ++ Φ' ⫐ Δ'⟧ ⟺
+  ⟦n ⋅ Φ ++ Φ' ⫐ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⫐ gshift m 0 <$> Δ') <$> Δ]⟧.
 Proof.
   rewrite /interp/=.
   repeat rewrite true_and; repeat rewrite false_or.
@@ -276,8 +276,8 @@ Proof.
 Qed.
 
 Lemma epis_pis m Ψ n Φ Φ' Δ :
-  ⟦n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ⟧ ⟺
-  ⟦n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ⟧.
+  ⟦n ⋅ Φ ++ [⫐ [m ⋅ Ψ]] ++ Φ' ⫐ Δ⟧ ⟺
+  ⟦n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⫐ gshift m 0 <$> Δ⟧.
 Proof.
   rewrite /interp/= true_and true_and.
   rewrite -nforall_add.
@@ -310,8 +310,8 @@ Proof.
 Qed.
 
 Lemma epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  ⟦γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ'⟧ ⟺
-  ⟦γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'⟧.
+  ⟦γ ⫐ Δ ++ [n ⋅ Φ ++ [⫐ [m ⋅ Ψ]] ++ Φ'] ++ Δ'⟧ ⟺
+  ⟦γ ⫐ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'⟧.
 Proof.
   rewrite /interp/= true_and true_and. case γ => [k Θ].
   apply proper_nforall; auto; apply proper_imp; auto.
@@ -340,13 +340,13 @@ Qed.
 
 Lemma coepis Φ :
   ⟦Φ⟧ ⟺
-  ⟦⊢ [0 ⋅ Φ]⟧.
+  ⟦⫐ [0 ⋅ Φ]⟧.
 Proof.
   by rewrite /interp/= true_imp_l true_and false_or.
 Qed.
 
 Lemma pet γ Δ Δ' :
-  ⟦γ ⊢ Δ ++ [∅] ++ Δ'⟧ ⟺
+  ⟦γ ⫐ Δ ++ [∅] ++ Δ'⟧ ⟺
   ⟦[]⟧.
 Proof.
   rewrite /interp/=. case γ => [m Ψ].
@@ -358,9 +358,9 @@ Qed.
 
 Lemma ipis i t n Φ Δ :
   0 <= i <= n ->
-  ⟦S n ⋅ Φ ⊢ Δ⟧ ⟺
-  ⟦[(n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ) ⊢
-    gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)); S n ⋅ Φ ⊢ Δ]⟧.
+  ⟦S n ⋅ Φ ⫐ Δ⟧ ⟺
+  ⟦[(n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ) ⫐
+    gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)); S n ⋅ Φ ⫐ Δ]⟧.
 Proof.
   intros Hi.
   rewrite /interp/= true_and.
@@ -400,8 +400,8 @@ Qed.
 
 Lemma ipet i t n Φ γ Δ Δ' :
   0 <= i <= n ->
-  ⟦γ ⊢ Δ ++ [S n ⋅ Φ] ++ Δ'⟧ ⟺
-  ⟦γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'⟧.
+  ⟦γ ⫐ Δ ++ [S n ⋅ Φ] ++ Δ'⟧ ⟺
+  ⟦γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'⟧.
 Proof.
   intros Hi.
   rewrite /interp/= true_and true_and. case: γ => [m Ψ].
@@ -482,12 +482,12 @@ Fixpoint finterp (A : form) : bouquet :=
   match A with
   | FAtom p args => Atom p args
   | ⊤ => []
-  | ⊥ => ∅ ⊢
+  | ⊥ => ∅ ⫐
   | A ∧ B => ⌈A⌉ ++ ⌈B⌉
-  | A ∨ B => ⊢ [0 ⋅ ⌈A⌉; 0 ⋅ ⌈B⌉]
-  | A ⊃ B => 0 ⋅ ⌈A⌉ ⊢ [0 ⋅ ⌈B⌉]
-  | #∀ A => 1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]
-  | #∃ A => ⊢ [1 ⋅ ⌈A⌉]
+  | A ∨ B => ⫐ [0 ⋅ ⌈A⌉; 0 ⋅ ⌈B⌉]
+  | A ⊃ B => 0 ⋅ ⌈A⌉ ⫐ [0 ⋅ ⌈B⌉]
+  | #∀ A => 1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]
+  | #∃ A => ⫐ [1 ⋅ ⌈A⌉]
   end
 where "⌈ A ⌉" := (finterp A).
 
@@ -857,7 +857,7 @@ Proof.
 
     rewrite /= bshift_zero.
     rewrite -fill_comp.
-    applyIH IH1 (Y ⪡ Z) (Petal ∅ [] 0 (Planter [] (Petal (0 ⋅ ⌈A⌉) [] 0 □ []) [0 ⋅ ⌈B⌉ ⊢ [0 ⋅ ⌈C⌉]]) []).
+    applyIH IH1 (Y ⪡ Z) (Petal ∅ [] 0 (Planter [] (Petal (0 ⋅ ⌈A⌉) [] 0 □ []) [0 ⋅ ⌈B⌉ ⫐ [0 ⋅ ⌈C⌉]]) []).
     { rewrite move_cons_right. apply subctx_app.
       subctxout Hsubctx.
       apply subctx_comp_in.
@@ -912,16 +912,16 @@ Proof.
     rewrite -fill_comp/= Terms.tshift_zero subst_fsubst unshift_funshift.
 
     etransitivity. eapply cstep_congr.
-    repispis 0 0 (@nil flower) [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]]. reflexivity.
+    repispis 0 0 (@nil flower) [1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]]. reflexivity.
 
     set iA := funshift 1 0 (fsubst 0 (Terms.tshift 1 0 t) A) in IH1 |- *.
-    set X0 := Petal (0 ⋅ ⌈iA⌉ ++ [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]]) [] 0 □ [].
+    set X0 := Petal (0 ⋅ ⌈iA⌉ ++ [1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]]) [] 0 □ [].
     rewrite -fill_comp.
     applyIH IH1 (Y ⪡ Z) X0.
     { rewrite move_cons_right. apply subctx_app.
       subctxout Hsubctx.
       apply subctx_comp_in.
-      subctxpet (@nil flower) [1 ⋅ [] ⊢ [0 ⋅ ⌈A⌉]] (@nil garden) (@nil garden). }
+      subctxpet (@nil flower) [1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]] (@nil garden) (@nil garden). }
 
     bypet (@nil garden) (@nil garden).
 
@@ -1000,7 +1000,7 @@ Proof.
   etransitivity; eauto.
 Qed.
 
-Definition pflower n Φ Ψ := n ⋅ Φ ⊢ [0 ⋅ Ψ].
+Definition pflower n Φ Ψ := n ⋅ Φ ⫐ [0 ⋅ Ψ].
 
 Add Morphism pflower with signature
   eq ==> eqprov ==> eqprov ==> eqprov
@@ -1017,26 +1017,26 @@ Proof.
   exact IH.
 Qed.
 
-Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⊢ [0 ⋅ Ψ]).
-Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⊢ [0 ⋅ Ψ]).
+Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 
-Infix "|~" := entails (at level 90).
-Infix "|≈" := sentails (at level 90).
+Infix "⊢" := entails (at level 90).
+Infix "⊩" := sentails (at level 90).
 
 Lemma entails_sentails Φ Ψ :
-  Φ |~ Ψ -> Φ |≈ Ψ.
+  Φ ⊢ Ψ -> Φ ⊩ Ψ.
 Proof.
   by apply cstep_gstep.
 Qed.
 
-Definition eqentails Φ Ψ := (Φ |~ Ψ) /\ (Ψ |~ Φ).
-Definition eqsentails Φ Ψ := (Φ |≈ Ψ) /\ (Ψ |≈ Φ).
+Definition eqentails Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
+Definition eqsentails Φ Ψ := (Φ ⊩ Ψ) /\ (Ψ ⊩ Φ).
 
-Infix "~||~" := eqentails (at level 90).
-Infix "≈||≈" := eqsentails (at level 90).
+Infix "⊣⊢" := eqentails (at level 90).
+Infix "⫣⊩" := eqsentails (at level 90).
 
 Lemma cut Φ Ψ :
-  Ψ ≈>* Φ ++ [0 ⋅ Φ ⊢ [0 ⋅ Ψ]].
+  Ψ ≈>* Φ ++ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]].
 Proof.
   estep.
   apply (Rs_grow (PPlanter [] PHole Ψ) Φ). cbn.
@@ -1055,19 +1055,19 @@ Proof.
 Qed.
 
 Lemma eqsentails_eqsprov Φ Ψ :
-  Φ ≈||≈ Ψ -> Φ ≣ Ψ.
+  Φ ⫣⊩ Ψ -> Φ ≣ Ψ.
 Proof.
   move => [H1 H2].
   repeat red. rewrite /sprov. split; move => H.
   repeat red in H1, H2.
   * etransitivity. eapply (cut Φ).
     etransitivity.
-    epose proof (Hc := sstep_congr (PPlanter Φ PHole []) [0 ⋅ Φ ⊢ [0 ⋅ Ψ]] _).
+    epose proof (Hc := sstep_congr (PPlanter Φ PHole []) [0 ⋅ Φ ⫐ [0 ⋅ Ψ]] _).
     list_simplifier. eapply Hc. eapply H1.
     list_simplifier. apply H.
   * etransitivity. eapply (cut Ψ).
     etransitivity.
-    epose proof (Hc := sstep_congr (PPlanter Ψ PHole []) [0 ⋅ Ψ ⊢ [0 ⋅ Φ]] _).
+    epose proof (Hc := sstep_congr (PPlanter Ψ PHole []) [0 ⋅ Ψ ⫐ [0 ⋅ Φ]] _).
     list_simplifier. eapply Hc. eapply H2.
     list_simplifier. apply H.
 Qed.
@@ -1090,7 +1090,7 @@ Admitted. *)
 (** ** Deduction *)
 
 Theorem deduction Φ Ψ :
-  Φ |~ Ψ <-> [] |~ 0 ⋅ Φ ⊢ [0 ⋅ Ψ].
+  Φ ⊢ Ψ <-> [] ⊢ 0 ⋅ Φ ⫐ [0 ⋅ Ψ].
 Proof.
   split; rewrite /entails; move => H; red in H |- *.
   * rctxmH [0;1] H.
@@ -1117,7 +1117,7 @@ Proof.
 Admitted.
 
 Lemma finterp_nforall_imp n A B :
-  ⌈n#∀ (A ⊃ B)⌉ ≡ n ⋅ ⌈A⌉ ⊢ [0 ⋅ ⌈B⌉].
+  ⌈n#∀ (A ⊃ B)⌉ ≡ n ⋅ ⌈A⌉ ⫐ [0 ⋅ ⌈B⌉].
 Admitted.
 
 Lemma flower_to_form_weak_iso : forall (ϕ : flower),
@@ -1128,7 +1128,7 @@ Proof.
   apply Forall_equiv_map in IHγ.
   apply Forall2_equiv_map_bind in IHγ.
   rewrite finterp_interp_map.
-  set Ψr := (x in _ ⊢ [0 ⋅ x] ≡ _).
+  set Ψr := (x in _ ⫐ [0 ⋅ x] ≡ _).
   pose proof (Hproper := proper_pflower_eqprov n n eq_refl _ _ IHγ Ψr Ψr
                          (Equivalence_Reflexive Ψr)).
   rewrite Hproper /pflower list_bind_singl /Ψr.
@@ -1156,11 +1156,11 @@ Add Morphism prov with signature
 Admitted.
 
 Lemma interp_entails Φ Ψ :
-  ⌈⟦Φ⟧⌉ |~ ⌈⟦Ψ⟧⌉ ->
-  Φ |~ Ψ.
+  ⌈⟦Φ⟧⌉ ⊢ ⌈⟦Ψ⟧⌉ ->
+  Φ ⊢ Ψ.
 Proof.
   move => H.
-  pose proof (Hiso := interp_weak_iso (0 ⋅ Φ ⊢ [0 ⋅ Ψ])).
+  pose proof (Hiso := interp_weak_iso (0 ⋅ Φ ⫐ [0 ⋅ Ψ])).
   rewrite [⌊[_]⌋]/= false_or/= finterp_And finterp_And in Hiso.
   repeat rewrite finterp_interp in H. red in H.
   rewrite /ftob Hiso in H.
@@ -1169,7 +1169,7 @@ Proof.
 Qed.
 
 Theorem structural_admissibility Φ Ψ :
-  Φ |≈ Ψ -> Φ |~ Ψ.
+  Φ ⊩ Ψ -> Φ ⊢ Ψ.
 Proof.
   move => H. red in H.
   apply ssoundness in H.
@@ -1190,10 +1190,10 @@ Qed.
 
 Definition mentails (Φ Ψ : bouquet) := [⟦Φ⟧] ⟹ ⟦Ψ⟧.
 
-Infix "|=" := mentails (at level 90).
+Infix "⊨" := mentails (at level 90).
 
 Theorem adequation Φ Ψ :
-  Φ |~ Ψ <-> Φ |= Ψ.
+  Φ ⊢ Ψ <-> Φ ⊨ Ψ.
 Proof.
   split; move => H.
 

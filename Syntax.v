@@ -25,9 +25,9 @@ Coercion btog : bouquet >-> garden.
 Notation "∅" := (0, nil).
 Notation "n ⋅ Φ" := (n, Φ) (format "n  ⋅  Φ", at level 63).
 
-Notation "γ ⊢ Δ" := (Flower γ Δ) (at level 65).
-Notation "γ ⊢" := (Flower γ nil) (at level 65).
-Notation "⊢ Δ" := (Flower ∅ Δ) (at level 65).
+Notation "γ ⫐ Δ" := (Flower γ Δ) (at level 65).
+Notation "γ ⫐" := (Flower γ nil) (at level 65).
+Notation "⫐ Δ" := (Flower ∅ Δ) (at level 65).
 
 (** ** Induction principles *)
 
@@ -38,7 +38,7 @@ Definition flower_induction_full :
   ∀ (IHt : ∀ (t : term), Pt t)
     (IHatom : ∀ p args, Forall Pt args -> P (Atom p args))
     (IHflower : ∀ (γ : garden) (Δ : list garden),
-      Pγ γ -> Forall Pγ Δ -> P (γ ⊢ Δ))
+      Pγ γ -> Forall Pγ Δ -> P (γ ⫐ Δ))
     (IHgarden : ∀ (n : nat) (Φ : bouquet),
       Forall P Φ -> Pγ (n ⋅ Φ)),
   ∀ (ϕ : flower), P ϕ.
@@ -60,7 +60,7 @@ Definition flower_induction	:
   let Pγ '(n ⋅ Φ) := Forall P Φ in
   ∀ (IHatom : ∀ p args, P (Atom p args))
     (IHflower : ∀ (γ : garden) (Δ : list garden),
-      Pγ γ -> Forall Pγ Δ -> P (γ ⊢ Δ)),
+      Pγ γ -> Forall Pγ Δ -> P (γ ⫐ Δ)),
   ∀ (ϕ : flower), P ϕ.
 Proof.
   intros. eapply flower_induction_full; eauto.
@@ -72,8 +72,8 @@ Qed.
 Fixpoint shift (n : nat) (c : nat) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tshift n c <$> args)
-  | m ⋅ Φ ⊢ Δ =>
-      m ⋅ shift n (c + m) <$> Φ ⊢
+  | m ⋅ Φ ⫐ Δ =>
+      m ⋅ shift n (c + m) <$> Φ ⫐
         ((λ '(k ⋅ Ψ), k ⋅ shift n (c + m + k) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
@@ -83,8 +83,8 @@ Definition gshift n c '(m ⋅ Φ) : garden :=
 Fixpoint unshift (n : nat) (c : nat) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tunshift n c <$> args)
-  | m ⋅ Φ ⊢ Δ =>
-      m ⋅ unshift n (c + m) <$> Φ ⊢
+  | m ⋅ Φ ⫐ Δ =>
+      m ⋅ unshift n (c + m) <$> Φ ⫐
         ((λ '(k ⋅ Ψ), k ⋅ unshift n (c + m + k) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
@@ -94,8 +94,8 @@ Definition gunshift n c '(m ⋅ Φ) : garden :=
 Fixpoint subst (n : nat) (t : term) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tsubst n t <$> args)
-  | m ⋅ Φ ⊢ Δ =>
-      m ⋅ subst (n + m) (tshift m 0 t) <$> Φ ⊢
+  | m ⋅ Φ ⫐ Δ =>
+      m ⋅ subst (n + m) (tshift m 0 t) <$> Φ ⫐
         ((λ '(k ⋅ Ψ), k ⋅ subst (n + m + k) (tshift (m + k) 0 t) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
@@ -270,8 +270,8 @@ Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
   match X with
   | Hole => Ψ
   | Planter Φ X Φ' => Φ ++ X ⋖ Ψ ++ Φ'
-  | Pistil n X Δ => [n ⋅ X ⋖ Ψ ⊢ Δ]
-  | Petal γ Δ n X Δ' => [γ ⊢ Δ ++ [n ⋅ X ⋖ Ψ] ++ Δ']
+  | Pistil n X Δ => [n ⋅ X ⋖ Ψ ⫐ Δ]
+  | Petal γ Δ n X Δ' => [γ ⫐ Δ ++ [n ⋅ X ⋖ Ψ] ++ Δ']
   end
 where "X ⋖ Ψ" := (fill Ψ X).
 
@@ -340,7 +340,7 @@ with fpath p ϕ :=
   | [] => Some (Hole, [ϕ])
   | i :: p =>
       match ϕ with
-      | γ ⊢ Δ =>
+      | γ ⫐ Δ =>
           match i with
           | 0 =>
               let '(n ⋅ Φ) := γ in
@@ -474,40 +474,40 @@ Inductive step : bouquet -> bouquet -> Prop :=
 (** *** Empty pistil *)
 
 | R_epis_pis m Ψ n Φ Φ' Δ :
-  n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ' ⊢ Δ ⇀
-  n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⊢ gshift m 0 <$> Δ
+  n ⋅ Φ ++ [⫐ [m ⋅ Ψ]] ++ Φ' ⫐ Δ ⇀
+  n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ') ⫐ gshift m 0 <$> Δ
 
 | R_epis_pet m Ψ n Φ Φ' γ Δ Δ' :
-  γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ' ⇀
-  γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'
+  γ ⫐ Δ ++ [n ⋅ Φ ++ [⫐ [m ⋅ Ψ]] ++ Φ'] ++ Δ' ⇀
+  γ ⫐ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'
 
 | R_coepis (Φ : bouquet) :
   Φ ⇀
-  ⊢ [0 ⋅ Φ]
+  ⫐ [0 ⋅ Φ]
 
 (** *** Empty petal *)
 
 | R_pet	γ Δ Δ' :
-  γ ⊢ Δ ++ [∅] ++ Δ' ⇀
+  γ ⫐ Δ ++ [∅] ++ Δ' ⇀
   []
 
 (** *** Reproduction *)
 
 | R_rep Δ n Φ Φ' Δ' :
-  n ⋅ Φ ++ [⊢ Δ] ++ Φ' ⊢ Δ' ⇀
-  n ⋅ Φ ++ Φ' ⊢ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⊢ gshift m 0 <$> Δ') <$> Δ]
+  n ⋅ Φ ++ [⫐ Δ] ++ Φ' ⫐ Δ' ⇀
+  n ⋅ Φ ++ Φ' ⫐ [0 ⋅ (λ '(m ⋅ Ψ), m ⋅ Ψ ⫐ gshift m 0 <$> Δ') <$> Δ]
 
 (** *** Instantiation *)
 
 | R_ipis i t n Φ Δ :
   0 <= i <= n ->
-  S n ⋅ Φ ⊢ Δ ⇀
-  [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ) ⊢ gunshift 1 i <$> (gsubst i (tshift (S n) 0 t) <$> Δ); S n ⋅ Φ ⊢ Δ]
+  S n ⋅ Φ ⫐ Δ ⇀
+  [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ) ⫐ gunshift 1 i <$> (gsubst i (tshift (S n) 0 t) <$> Δ); S n ⋅ Φ ⫐ Δ]
 
 | R_ipet i t n Φ γ Δ Δ' :
   0 <= i <= n ->
-  γ ⊢ Δ ++ [S n ⋅ Φ] ++ Δ' ⇀
-  γ ⊢ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'
+  γ ⫐ Δ ++ [S n ⋅ Φ] ++ Δ' ⇀
+  γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
 
@@ -950,7 +950,7 @@ Ltac rwcopolm p i Φl Ψ Φr :=
 Ltac rcoepispet n m Φl Φr Δl Δr :=
   rewrite /ftob;
   match goal with
-  | |- [?γ ⊢ _] ~>* _ =>
+  | |- [?γ ⫐ _] ~>* _ =>
       let H := fresh "H" in
       epose proof (H := R_co_epis_pet m _ n Φl Φr γ Δl Δr);
       list_simplifier;
@@ -962,7 +962,7 @@ Ltac rcoepispet n m Φl Φr Δl Δr :=
 Ltac repispet n m Φl Φr Δl Δr :=
   rewrite /ftob;
   match goal with
-  | |- [?γ ⊢ _] ~>* _ =>
+  | |- [?γ ⫐ _] ~>* _ =>
       let H := fresh "H" in
       epose proof (H := R_epis_pet m _ n Φl Φr γ Δl Δr);
       list_simplifier;
@@ -974,7 +974,7 @@ Ltac repispet n m Φl Φr Δl Δr :=
 (* Ltac rcoepispis n m Φl Φr :=
   rewrite /ftob;
   match goal with
-  | |- [_ ⊢ ?Δ] ~>* _ =>
+  | |- [_ ⫐ ?Δ] ~>* _ =>
       let H := fresh "H" in
       epose proof (H := R_co_epis_pis m _ n Φl Φr Δ);
       list_simplifier;
@@ -987,7 +987,7 @@ Ltac repispet n m Φl Φr Δl Δr :=
 Ltac repispis n m Φl Φr :=
   rewrite /ftob;
   match goal with
-  | |- [_ ⊢ ?Δ] ~>* _ =>
+  | |- [_ ⫐ ?Δ] ~>* _ =>
       let H := fresh "H" in
       epose proof (H := R_epis_pis m _ n Φl Φr Δ);
       list_simplifier;
@@ -999,7 +999,7 @@ Ltac repispis n m Φl Φr :=
 
 Ltac rrep Φl Φr :=
   match goal with
-  | |- [?n ⋅ _ ⊢ ?Δ] ~>* _ =>
+  | |- [?n ⋅ _ ⫐ ?Δ] ~>* _ =>
       let H := fresh "H" in
       epose proof (H := R_rep _ n Φl Φr Δ);
       list_simplifier;
