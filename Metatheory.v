@@ -338,6 +338,13 @@ Proof.
   eqd.
 Qed.
 
+Lemma coepis Φ :
+  ⟦Φ⟧ ⟺
+  ⟦⊢ [0 ⋅ Φ]⟧.
+Proof.
+  by rewrite /interp/= true_imp_l true_and false_or.
+Qed.
+
 Lemma pet γ Δ Δ' :
   ⟦γ ⊢ Δ ++ [∅] ++ Δ'⟧ ⟺
   ⟦[]⟧.
@@ -427,21 +434,13 @@ Proof.
   (* Pollination *)
 
   * by apply pollination.
+  * symmetry. by apply pollination.
 
   (* Empty pistil *)
 
   * by apply epis_pis.
   * by apply epis_pet.
-
-  (* Co-pollination + co-empty pistil *)
-  * set Z := Pistil 0 □ [0 ⋅ Φ].
-    epose proof (Hpol := pollination (X ⪡ Z) Ψ n).
-    repeat rewrite -fill_comp /= in Hpol.
-    rewrite Hpol.
-    epose proof (Hp := pollin_comp_out _ n _ Z);
-    rewrite Nat.add_0_r /= in Hp; by eapply Hp.
-    apply grounding.
-    by rewrite /interp/= true_imp_l true_and false_or.
+  * by apply coepis.
 
   (* Empty petal *)
 
@@ -562,32 +561,6 @@ Proof.
   rewrite /cinterp bind_cons fmap_cons fmap_app bind_cons.
   by rewrite subst_fsubst IH.
 Qed.
-
-(* Definition dummin := 0.
-
-Definition lmin (l : list nat) : nat :=
-  match l with
-  | [] => dummin
-  | n :: l => foldr Nat.min n l
-  end.
-
-Fixpoint tminvar (c : nat) (t : Terms.term) : nat :=
-  match t with
-  | Terms.TVar n => if c <? n then n else dummin
-  | Terms.TFun _ args => lmin (tminvar c <$> args)
-  end.
-
-Fixpoint fminvar (c : nat) (A : form) : nat :=
-  match A with
-  | FAtom p args => lmin (tminvar c <$> args)
-  | FTrue => dummin
-  | FFalse => dummin
-  | FAnd A B => lmin [fminvar c A; fminvar c B]
-  | FOr A B => lmin [fminvar c A; fminvar c B]
-  | FImp A B => lmin [fminvar c A; fminvar c B]
-  | FForall A => fminvar (c + 1) A
-  | FExists A => fminvar (c + 1) A
-  end. *)
 
 Definition is_shifted (n : nat) (A : form) : Prop :=
   exists B, A = fshift n 0 B.
@@ -753,16 +726,30 @@ Proof.
     rpetm (@nil nat) Δ Δ';
     reflexivity.
 
-  Ltac pull_hyp H A Γ Γ' :=
+  Ltac pull_hyp H A C Γ Γ' :=
     assert (HA : A ∈ (Γ ++ A :: Γ')); [> solve_elem_of_list |];
     let Y := fresh "Y" in
     let Z := fresh "Z" in
     let Hpol := fresh "Hpol" in
     let Hshifted := fresh "Hshifted" in
     case (H A HA) => [n [Hshifted [Y [Z [Hpol Hcomp]]]]]; subst;
+    estep; [> eapply R_ctx; eapply R_coepis |];
     repeat rewrite -fill_comp;
-    estep; [> eapply R_ctx; eapply R_copolepis; eapply Hpol |];
-    rewrite (is_shifted_bshift_unshift _ _ Hshifted) /=;
+    estep; [>
+      eapply R_ctx;
+      let Z0 := constr:(Pistil 0 □ [0 ⋅ ⌈C⌉]) in
+      let Hpol' := fresh "Hpol'" in
+      let Hp := fresh "Hp" in
+      epose proof (Hpol' := pollin_comp_out _ _ _ Z0 Hpol);
+      rewrite /= Nat.add_0_r in Hpol';
+      epose proof (Hp := R_copol _ _ (Z ⪡ Z0) Hpol');
+      rewrite -fill_comp /= in Hp;
+      eapply Hp
+    |];
+    let Hs := fresh "Hs" in
+    pose proof (Hs := is_shifted_bshift_unshift _ _ Hshifted);
+    rewrite /= in Hs; try rewrite Hs; clear Hs;
+    repeat rewrite -fill_comp /=;
 
     assert (Hsubctx : (Γ ++ Γ') ⪽ Y ⪡ Z); [>
       eapply subctx_subset; [> |eapply H];
@@ -832,7 +819,7 @@ Proof.
     bypet (@nil garden) [1 ⋅ ⌈C⌉].
 
   (* L⊤ *)
-  * pull_hyp H ⊤ Γ Γ'.
+  * pull_hyp H ⊤ C Γ Γ'.
 
     applyIH IH1 (Y ⪡ Z) (Petal ∅ [] 0 □ []).
     { subctxout Hsubctx. }
@@ -840,7 +827,7 @@ Proof.
     bypet (@nil garden) (@nil garden).
 
   (* L⊥ *)
-  * pull_hyp H ⊥ Γ Γ'.
+  * pull_hyp H ⊥ C Γ Γ'.
 
     etransitivity. rewrite fill_comp. eapply cstep_congr.
     rewrite /ftob. rrep (@nil flower) (@nil flower). reflexivity.
@@ -849,7 +836,7 @@ Proof.
     bypet (@nil garden) (@nil garden).
 
   (* L∧ *)
-  * pull_hyp H (A ∧ B) Γ Γ'.
+  * pull_hyp H (A ∧ B) C Γ Γ'.
 
     applyIH IH1 (Y ⪡ Z) (Petal (0 ⋅ ⌈A⌉ ++ ⌈B⌉) [] 0 □ []).
     { rewrite move_cons_right [_ ++ B :: _]move_cons_right.
@@ -863,7 +850,7 @@ Proof.
     bypet (@nil garden) (@nil garden).
 
   (* L∨ *)
-  * pull_hyp H (A ∨ B) Γ Γ'.
+  * pull_hyp H (A ∨ B) C Γ Γ'.
 
     etransitivity. rewrite fill_comp. eapply cstep_congr.
     rewrite /ftob. rrep (@nil flower) (@nil flower). reflexivity.
@@ -895,7 +882,7 @@ Proof.
     reflexivity.
 
   (* L⊃ *)
-  * pull_hyp H (A ⊃ B) Γ Γ'.
+  * pull_hyp H (A ⊃ B) C Γ Γ'.
 
     applyIH IH1 (Y ⪡ Z) (Pistil 0 (Pistil 0 □ [0 ⋅ ⌈B⌉]) [0 ⋅ ⌈C⌉]).
     { subctxout Hsubctx. }
@@ -913,7 +900,7 @@ Proof.
     bypet (@nil garden) (@nil garden).
 
   (* L∀ *)
-  * pull_hyp H (#∀ A) Γ Γ'.
+  * pull_hyp H (#∀ A) C Γ Γ'.
 
     estep; [> rewrite fill_comp |].
     { set X0 := Pistil 0 □ [0 ⋅ ⌈C⌉].
@@ -939,7 +926,7 @@ Proof.
     bypet (@nil garden) (@nil garden).
 
   (* L∃ *)
-  * pull_hyp H (#∃ A) Γ Γ'.
+  * pull_hyp H (#∃ A) C Γ Γ'.
 
     repeat rewrite fill_comp. etransitivity. apply cstep_congr.
     repispis 0 1 (@nil flower) (@nil flower). reflexivity.
@@ -1057,17 +1044,6 @@ Admitted. *)
 
 (** ** Deduction *)
 
-Lemma coepis Φ :
-  Φ ~>* ⊢ [0 ⋅ Φ].
-Proof.
-  estep. rself.
-  pose proof (Hstep := R_copolepis [] Φ 0 (Planter [] □ [])); list_simplifier.
-  apply Hstep.
-  pose proof (Hp := P_wind_l [] □ [] [] []); list_simplifier.
-  exact Hp.
-  reflexivity.
-Qed.
-
 Theorem deduction Φ Ψ :
   Φ |~ Ψ <-> [] |~ 0 ⋅ Φ ⊢ [0 ⋅ Ψ].
 Proof.
@@ -1075,7 +1051,7 @@ Proof.
   * rctxmH [0;1] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-  * etransitivity. eapply coepis. done.
+  * estep. rself. apply R_coepis. done.
 Qed.
 
 (** ** Admissibility of structural rules *)

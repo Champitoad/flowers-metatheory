@@ -466,6 +466,11 @@ Inductive step : bouquet -> bouquet -> Prop :=
   X ⋖ (shift n 0 <$> Ψ) ⇀
   X ⋖ []
 
+| R_copol (Ψ : bouquet) n X :
+  Ψ ≺ n in X ->
+  X ⋖ [] ⇀
+  X ⋖ (shift n 0 <$> Ψ)
+
 (** *** Empty pistil *)
 
 | R_epis_pis m Ψ n Φ Φ' Δ :
@@ -476,12 +481,9 @@ Inductive step : bouquet -> bouquet -> Prop :=
   γ ⊢ Δ ++ [n ⋅ Φ ++ [⊢ [m ⋅ Ψ]] ++ Φ'] ++ Δ' ⇀
   γ ⊢ Δ ++ [n + m ⋅ (shift m 0 <$> Φ) ++ Ψ ++ (shift m 0 <$> Φ')] ++ Δ'
 
-(** *** Co-pollination + co-empty pistil *)
-
-| R_copolepis (Ψ Φ : bouquet) n X :
-  Ψ ≺ n in X ->
-  X ⋖ Φ ⇀
-  X ⋖ (0 ⋅ shift n 0 <$> Ψ ⊢ [0 ⋅ Φ])
+| R_coepis (Φ : bouquet) :
+  Φ ⇀
+  ⊢ [0 ⋅ Φ]
 
 (** *** Empty petal *)
 
