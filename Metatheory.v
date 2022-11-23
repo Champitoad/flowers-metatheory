@@ -583,7 +583,7 @@ Qed.
 Definition subctx (Γ : list form) (X : ctx) : Prop :=
   forall D, D ∈ Γ -> exists n, is_shifted n D /\ nassum n ⌈D⌉ X.
 
-Infix "⪽" := subctx (at level 30).
+Infix "⪽" := subctx (at level 70).
 
 Lemma subctx_nil X :
   [] ⪽ X.
@@ -990,7 +990,7 @@ Infix "≡" := eqprov.
 Definition sprov Φ := Φ ≈>* [].
 Definition eqsprov Φ Ψ := sprov Φ <-> sprov Ψ.
 
-Infix "≣" := eqsprov (at level 90).
+Infix "≣" := eqsprov (at level 70).
 
 #[export] Instance equiv_eqprov : Equivalence eqprov.
 Proof.
@@ -1020,8 +1020,8 @@ Qed.
 Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 
-Infix "⊢" := entails (at level 90).
-Infix "⊩" := sentails (at level 90).
+Infix "⊢" := entails (at level 70).
+Infix "⊩" := sentails (at level 70).
 
 Lemma entails_sentails Φ Ψ :
   Φ ⊢ Ψ -> Φ ⊩ Ψ.
@@ -1032,8 +1032,8 @@ Qed.
 Definition eqentails Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
 Definition eqsentails Φ Ψ := (Φ ⊩ Ψ) /\ (Ψ ⊩ Φ).
 
-Infix "⊣⊢" := eqentails (at level 90).
-Infix "⫣⊩" := eqsentails (at level 90).
+Infix "⊣⊢" := eqentails (at level 70).
+Infix "⫣⊩" := eqsentails (at level 70).
 
 Lemma cut Φ Ψ :
   Ψ ≈>* Φ ++ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]].
@@ -1111,32 +1111,6 @@ Proof.
   by rewrite /interp/= finterp_And.
 Qed.
 
-Lemma finterp_interp_map (Φ : bouquet) :
-  ⌈⟦Φ⟧⌉ = ϕ ← Φ; ⌈⌊ϕ⌋⌉.
-Proof.
-Admitted.
-
-Lemma finterp_nforall_imp n A B :
-  ⌈n#∀ (A ⊃ B)⌉ ≡ n ⋅ ⌈A⌉ ⫐ [0 ⋅ ⌈B⌉].
-Admitted.
-
-Lemma flower_to_form_weak_iso : forall (ϕ : flower),
-  ⌈⌊ϕ⌋⌉ ≡ [ϕ].
-Proof.
-  elim/flower_induction => [p args |[n Φ] Δ IHγ IHΔ] //=.
-  rewrite finterp_nforall_imp.
-  apply Forall_equiv_map in IHγ.
-  apply Forall2_equiv_map_bind in IHγ.
-  rewrite finterp_interp_map.
-  set Ψr := (x in _ ⫐ [0 ⋅ x] ≡ _).
-  pose proof (Hproper := proper_pflower_eqprov n n eq_refl _ _ IHγ Ψr Ψr
-                         (Equivalence_Reflexive Ψr)).
-  rewrite Hproper /pflower list_bind_singl /Ψr.
-  clear IHγ Hproper Ψr.
-
-  elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH] /=. admit.
-Admitted.
-
 Lemma interp_weak_iso : forall (Φ : bouquet),
   ⌈[⌊[Φ]⌋]⌉ ≡ Φ.
 Proof.
@@ -1185,12 +1159,84 @@ Qed.
 (** This is the more standard model-theoretical formulation of
     soundness/completeness. It allows to dispense with the semantics -> syntax
     translation [finterp] from formulas to flowers in the statement, and
-    ensures that it is the (weak) inverse of the syntax -> semantics
-    interpretation [interp]. *)
+    ensures that it is the weak inverse of the syntax -> semantics
+    interpretation [interp].
+
+    By weak inverse, we mean that we have only an equivalence instead of an
+    equality between ⌈⌊Φ⌋⌉ and Φ. We conjecture that syntactic equivalence
+    holds, i.e. ⌈⌊Φ⌋⌉ ⊣⊢ Φ, but this cannot make sense without admissibility of
+    the grow rule, which is a priori necessary for transitivity of ⊣⊢ (and also
+    to prove that ⊣⊢ implies equiprovability).
+
+    Instead we rely on semantic equivalence Φ ⫤⊨ Ψ, the fact that [interp] is a
+    weak inverse of [finterp] in the sense of equiderivability in sequent
+    calculus, and cut admissibility. *)
 
 Definition mentails (Φ Ψ : bouquet) := [⟦Φ⟧] ⟹ ⟦Ψ⟧.
+Infix "⊨" := mentails (at level 70).
 
-Infix "⊨" := mentails (at level 90).
+Definition eqmentails Φ Ψ := Φ ⊨ Ψ /\ Ψ ⊨ Φ.
+Infix "⫤⊨" := eqmentails (at level 70).
+
+Lemma finterp_weak_iso (A : form) :
+  ⟦⌈A⌉⟧ ⟺ A.
+Admitted.
+
+Lemma eqmentails_eqderiv Φ Ψ :
+  Φ ⫤⊨ Ψ <-> (⟦Φ⟧ ⟺ ⟦Ψ⟧).
+Proof.
+  by rewrite /eqmentails/mentails/eqderiv.
+Qed.
+
+Lemma finterp_interp_eqmentails Φ :
+  Φ ⫤⊨ ⌈⟦Φ⟧⌉.
+Proof.
+  by rewrite eqmentails_eqderiv finterp_weak_iso.
+Qed.
+
+(** Weak provability *)
+Definition wprov Φ := exists Ψ, Ψ ~>* [] /\ Φ ⫤⊨ Ψ.
+
+Definition mtrue Φ := ⟦Φ⟧ ⟺ ⊤.
+
+Lemma interp_void :
+  ⟦[]⟧ = ⊤.
+Proof.
+  done.
+Qed.
+
+Theorem weak_adequation Φ :
+  wprov Φ <-> mtrue Φ.
+Proof.
+  rewrite /wprov/mtrue. split; move => H.
+
+  (* Soundness *)
+  * move: H => [Ψ [Hprov Heqm]].
+    rewrite eqmentails_eqderiv in Heqm.
+    rewrite Heqm -interp_void.
+    by apply soundness.
+
+  (* Completeness *)
+  * exists ⌈⟦Φ⟧⌉. split.
+    - pose proof (Hc := completeness [] ⟦Φ⟧).
+      rewrite /= in Hc.
+      estep. rself. apply R_coepis.
+      apply Hc.
+      apply Semantics.structural_admissibility.
+      rewrite H.
+      isrch.
+    - by apply finterp_interp_eqmentails.
+Qed.
+
+Theorem weak_structural_admissibility Φ :
+  [] ⊩ Φ -> wprov Φ.
+Proof.
+  move => H.
+  apply ssoundness in H.
+  apply weak_adequation.
+  rewrite /interp/= true_and false_or true_imp_l in H.
+  by split; [> isrch |].
+Qed.
 
 Theorem adequation Φ Ψ :
   Φ ⊢ Ψ <-> Φ ⊨ Ψ.
