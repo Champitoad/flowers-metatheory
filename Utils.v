@@ -65,6 +65,9 @@ Qed.
 
 (** * Lists *)
 
+Definition forallb (l : list bool) :=
+  foldr andb true l.
+
 Ltac solve_elem_of_list :=
   match goal with
   | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list

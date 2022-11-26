@@ -1,4 +1,4 @@
-Require Import stdpp.list.
+Require Import stdpp.list stdpp.list_numbers.
 Require Import ssreflect.
 
 Require Import Flowers.Utils.
@@ -69,6 +69,12 @@ Proof.
   intros. eapply term_induction_full; eauto.
   exact (fun _ => I).
 Qed.
+
+Fixpoint tclosed (c : nat) (t : term) : bool :=
+  match t with
+  | TVar n => n <? c
+  | TFun f args => forallb (tclosed c <$> args)
+  end.
 
 Fixpoint tsubst (n : nat) (u : term) (t : term) : term :=
   match t with

@@ -1,4 +1,4 @@
-Require Import stdpp.list stdpp.relations.
+Require Import stdpp.list stdpp.relations stdpp.list_numbers.
 Require Import ssreflect.
 Require Import String.
 
@@ -261,6 +261,20 @@ Fixpoint bv (X : ctx) : nat :=
   | Pistil n X _ => n + bv X
   | Petal (n ⋅ _) _  m X _ => n + m + bv X
   end.
+
+(** *** Check if a flower is closed *)
+
+Fixpoint closed (c : nat) (ϕ : flower) : bool :=
+  match ϕ with
+  | Atom p args => forallb (tclosed c <$> args)
+  | n ⋅ Φ ⫐ Δ =>
+      forallb (closed (c + n) <$> Φ) &&
+      forallb ((λ '(m ⋅ Ψ), forallb (closed (c + n + m) <$> Ψ)) <$> Δ)
+  end.
+
+(** *** Closed flowers *)
+
+Definition cflower := { ϕ : flower | closed 0 ϕ }.
 
 (** ** Context operations *)
 
@@ -1013,3 +1027,117 @@ Ltac rpet Δ Δ' :=
 Ltac rpetm p Δ Δ' :=
   rcstepm p (@nil flower); [> rpet Δ Δ' |].
   
+Ltac estep := etransitivity; [> eapply rtc_once |].
+
+(** * Provability *)
+
+Definition prov Φ := Φ ~>* [].
+Definition eqprov Φ Ψ := prov Φ <-> prov Ψ.
+
+Infix "≡" := eqprov.
+
+Definition sprov Φ := Φ ≈>* [].
+Definition eqsprov Φ Ψ := sprov Φ <-> sprov Ψ.
+
+Infix "≣" := eqsprov (at level 70).
+
+#[export] Instance equiv_eqprov : Equivalence eqprov.
+Proof.
+  econs; red; rewrite /eqprov; intros.
+  by reflexivity.
+  by symmetry.
+  etransitivity; eauto.
+Qed.
+
+Definition pflower n Φ Ψ := n ⋅ Φ ⫐ [0 ⋅ Ψ].
+
+Lemma cstep_gstep Φ Ψ :
+  Φ ~>* Ψ -> Φ ≈>* Ψ.
+Proof.
+  elim => [Φ1 |Φ1 Φ2 Φ3 Hstep _ IH]. reflexivity.
+  apply (rtc_l _ _ Φ2).
+  { case: Hstep => {Φ Ψ} [X Φ Ψ Hstep]. by apply Rs_ctx. }
+  exact IH.
+Qed.
+
+Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+
+Infix "⊢" := entails (at level 70).
+Infix "⊩" := sentails (at level 70).
+
+Lemma entails_sentails Φ Ψ :
+  Φ ⊢ Ψ -> Φ ⊩ Ψ.
+Proof.
+  by apply cstep_gstep.
+Qed.
+
+Definition eqentails Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
+Definition eqsentails Φ Ψ := (Φ ⊩ Ψ) /\ (Ψ ⊩ Φ).
+
+Infix "⊣⊢" := eqentails (at level 70).
+Infix "⫣⊩" := eqsentails (at level 70).
+
+Lemma cut Φ Ψ :
+  Ψ ≈>* Φ ++ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]].
+Proof.
+  estep.
+  apply (Rs_grow (PPlanter [] PHole Ψ) Φ). cbn.
+  estep.
+  epose proof (Hc := Rs_ctx (PPlanter Φ PHole []) Ψ _).
+  list_simplifier. eapply Hc. eapply R_coepis.
+  estep.
+  epose proof (Hc := Rs_ctx □ _ _).
+  list_simplifier. eapply Hc.
+
+  pose proof (Hp := R_copol Φ 0 (Planter Φ (Pistil 0 □ [0 ⋅ Ψ]) [])).
+  list_simplifier. apply Hp.
+  epose proof (Hpol := P_wind_r Φ (Pistil _ □ _) [] [] []).
+  list_simplifier. rewrite Nat.add_0_r in Hpol. eapply Hpol.
+  rewrite bshift_zero. reflexivity.
+Qed.
+
+Lemma eqsentails_eqsprov Φ Ψ :
+  Φ ⫣⊩ Ψ -> Φ ≣ Ψ.
+Proof.
+  move => [H1 H2].
+  repeat red. rewrite /sprov. split; move => H.
+  repeat red in H1, H2.
+  * etransitivity. eapply (cut Φ).
+    etransitivity.
+    epose proof (Hc := sstep_congr (PPlanter Φ PHole []) [0 ⋅ Φ ⫐ [0 ⋅ Ψ]] _).
+    list_simplifier. eapply Hc. eapply H1.
+    list_simplifier. apply H.
+  * etransitivity. eapply (cut Ψ).
+    etransitivity.
+    epose proof (Hc := sstep_congr (PPlanter Ψ PHole []) [0 ⋅ Ψ ⫐ [0 ⋅ Φ]] _).
+    list_simplifier. eapply Hc. eapply H2.
+    list_simplifier. apply H.
+Qed.
+
+(* Global Instance sentails_po : PreOrder sentails.
+Proof.
+  econs; red.
+  * move => Φ. apply entails_sentails. red.
+    pose proof (Hpol := R_pol Φ 0 (Petal (0 ⋅ Φ) [] 0 □ [])).
+    rewrite /= bshift_zero in Hpol. red.
+    estep. rself. eapply Hpol.
+    pose proof (Hp := P_self Φ □ 0 [] [] [] 0 []); list_simplifier.
+    exact Hp.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
+  * rewrite /sentails. move => Φ1 Φ2 Φ3 H1 H2.
+    admit.
+Admitted. *)
+
+(** ** Deduction *)
+
+Theorem deduction Φ Ψ :
+  Φ ⊢ Ψ <-> [] ⊢ 0 ⋅ Φ ⫐ [0 ⋅ Ψ].
+Proof.
+  split; rewrite /entails; move => H; red in H |- *.
+  * rctxmH [0;1] H.
+    rpetm (@nil nat) (@nil garden) (@nil garden).
+    reflexivity.
+  * estep. rself. apply R_coepis. done.
+Qed.
