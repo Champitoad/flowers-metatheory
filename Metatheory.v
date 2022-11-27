@@ -1022,7 +1022,7 @@ Proof.
 Qed.
 
 Theorem structural_admissibility Φ Ψ :
-  Φ ⊩ Ψ -> Φ ⊢ Ψ.
+  Φ ⊢s Ψ -> Φ ⊢ Ψ.
 Proof.
   move => H. red in H.
   apply ssoundness in H.
@@ -1108,7 +1108,7 @@ Proof.
 Qed.
 
 Theorem weak_structural_admissibility Φ :
-  [] ⊩ Φ -> wprov Φ.
+  [] ⊢s Φ -> wprov Φ.
 Proof.
   move => H.
   apply ssoundness in H.

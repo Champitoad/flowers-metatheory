@@ -1,6 +1,6 @@
 Require Import ssreflect.
 Require Import String.
-Require Import stdpp.list stdpp.relations.
+Require Import stdpp.list stdpp.vector stdpp.relations.
 
 (** Names *)
 
@@ -65,8 +65,23 @@ Qed.
 
 (** * Lists *)
 
+Lemma vec_resize {A n m} :
+  n = m -> vec A n -> vec A m.
+Proof.
+  move => p. destruct p. auto.
+Qed.
+
+Lemma cons_length_inv {A} (l : list A) (n : nat) :
+  length l = S n -> { x & { l' & l = x :: l' } }.
+Admitted.
+
 Definition forallb (l : list bool) :=
   foldr andb true l.
+
+Lemma forallb_fmap {A} (P : A -> bool) (l : list A) :
+  forallb (P <$> l) ->
+  ∀ x, x ∈ l -> P x.
+Admitted.
 
 Ltac solve_elem_of_list :=
   match goal with

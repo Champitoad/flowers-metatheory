@@ -272,8 +272,6 @@ Fixpoint closed (c : nat) (ϕ : flower) : bool :=
       forallb ((λ '(m ⋅ Ψ), forallb (closed (c + n + m) <$> Ψ)) <$> Δ)
   end.
 
-(** *** Closed flowers *)
-
 Definition cflower := { ϕ : flower | closed 0 ϕ }.
 
 (** ** Context operations *)
@@ -1064,19 +1062,19 @@ Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 
 Infix "⊢" := entails (at level 70).
-Infix "⊩" := sentails (at level 70).
+Infix "⊢s" := sentails (at level 70).
 
 Lemma entails_sentails Φ Ψ :
-  Φ ⊢ Ψ -> Φ ⊩ Ψ.
+  Φ ⊢ Ψ -> Φ ⊢s Ψ.
 Proof.
   by apply cstep_gstep.
 Qed.
 
 Definition eqentails Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
-Definition eqsentails Φ Ψ := (Φ ⊩ Ψ) /\ (Ψ ⊩ Φ).
+Definition eqsentails Φ Ψ := (Φ ⊢s Ψ) /\ (Ψ ⊢s Φ).
 
 Infix "⊣⊢" := eqentails (at level 70).
-Infix "⫣⊩" := eqsentails (at level 70).
+Infix "⊣s⊢" := eqsentails (at level 70).
 
 Lemma cut Φ Ψ :
   Ψ ≈>* Φ ++ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]].
@@ -1098,7 +1096,7 @@ Proof.
 Qed.
 
 Lemma eqsentails_eqsprov Φ Ψ :
-  Φ ⫣⊩ Ψ -> Φ ≣ Ψ.
+  Φ ⊣s⊢ Ψ -> Φ ≣ Ψ.
 Proof.
   move => [H1 H2].
   repeat red. rewrite /sprov. split; move => H.

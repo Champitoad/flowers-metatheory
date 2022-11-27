@@ -4,4 +4,6 @@ Terms.v
 Syntax.v
 Semantics.v
 Metatheory.v
+KripkeSemantics.v
+KripkeMetatheory.v
 Utils.v

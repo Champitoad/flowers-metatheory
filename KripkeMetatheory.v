@@ -1,6 +1,7 @@
 Require Import ssreflect stdpp.propset.
+Require Import Classical.
 
-Require Import Flowers.Syntax Flowers.Utils.
+Require Import Flowers.Syntax Flowers.KripkeSemantics Flowers.Utils.
 
 Definition theory : Type := propset flower.
 
@@ -10,10 +11,10 @@ Definition bouquet_to_theory (Φ : bouquet) : theory :=
 Coercion bouquet_to_theory : bouquet >-> theory.
 
 Definition tentails (T : theory) (Ψ : bouquet) :=
-  ∃ Φ, (bouquet_to_theory Φ) ⊂ T /\ Φ ⊢ Ψ.
+  ∃ Φ, (bouquet_to_theory Φ) ⊆ T /\ Φ ⊢ Ψ.
 
 Definition tnentails (T : theory) (Ψ : bouquet) :=
-  ∀ Φ, (bouquet_to_theory Φ) ⊂ T -> ~ Φ ⊢ Ψ.
+  ∀ Φ, (bouquet_to_theory Φ) ⊆ T -> ~ Φ ⊢ Ψ.
 
 Infix "!⊢" := tentails (at level 70).
 Infix "!⊬" := tnentails (at level 70).
