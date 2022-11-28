@@ -2,6 +2,8 @@ Require Import ssreflect stdpp.boolset stdpp.propset stdpp.vector.
 
 Require Import Flowers.Utils Flowers.Terms Flowers.Syntax.
 
+(** * Well-formed terms with respect to a signature *)
+
 Record sig : Type := {
   funs : boolset name;
   preds : boolset name;
@@ -69,6 +71,32 @@ Definition wfflower :=
 Definition wfbouquet :=
   { Φ : bouquet & wf Φ }.
 
+Definition ffgt : wfflower -> flower := projT1.
+Definition bfgt : wfbouquet -> bouquet := projT1.
+Coercion ffgt : wfflower >-> flower.
+Coercion bfgt : wfbouquet >-> bouquet.
+
+(** ** Theories are sets of well-formed flowers *)
+
+Definition theory := propset wfflower.
+
+Definition ftot (ϕ : wfflower) : theory := {[ ϕ ]}.
+
+Definition btot (Φ : wfbouquet) : theory :=
+  let fix aux Φ (HΦ : wf Φ) {struct HΦ} : propset wfflower :=
+    match HΦ with
+    | wf_nil => propset_empty
+    | wf_cons ϕ Φ Hϕ HΦ => {[ ψ | ψ = ϕ ⇂ Hϕ \/ ψ ∈ aux Φ HΦ ]}
+    end in
+  let 'Φ ⇂ HΦ := Φ in
+  aux Φ HΦ.
+
+#[global] Coercion ftot : wfflower >-> theory.
+#[global] Coercion btot : wfbouquet >-> theory.
+
+(** * Pre-models are just domains with interpretation functions for well-formed
+      terms *)
+
 Definition elem {A C} `{Set_ A C} (X : C) :=
   { x | x ∈ X }.
 
@@ -80,13 +108,13 @@ Class premodel (D : Type) := {
     propset (vec (elem domain) (Σ.(parity) p H));
 }.
 
-Lemma elem_subseteq {A : Type} (X Y : propset A) :
+Definition elem_subseteq {A : Type} (X Y : propset A) :
   X ⊆ Y -> elem X -> elem Y.
 Proof.
   move => H [x Hx]. exists x. exact (H x Hx).
 Defined.
 
-Lemma elem_subseteq_vec {A : Type} (X Y : propset A) :
+Definition elem_subseteq_vec {A : Type} (X Y : propset A) :
   X ⊆ Y -> ∀ n, vec (elem X) n -> vec (elem Y) n.
 Proof.
   move => H. elim => [|n IH] xs.
@@ -98,13 +126,21 @@ Proof.
     - exact (IH xs).
 Defined.
 
+(* Pre-model inclusion is domain and interpretation inclusion *)
+
 Definition premodel_incl {D} (M1 M2 : premodel D) : Prop.
 Proof.
   refine { H : M1.(domain) ⊆ M2.(domain) | _ }.
-  refine (∀ (f : name) (w : f ∈ Σ.(funs)) (args : vec (elem M1.(domain)) (Σ.(farity) f w)), _ =@{elem M2.(domain)} _).
-  refine (elem_subseteq _ _ H (M1.(interp_fun) f w args)).
-  refine (M2.(interp_fun) f w (elem_subseteq_vec _ _ H _ args)).
+  refine (_ /\ _).
+  * refine (∀ (f : name) (Hf : f ∈ Σ.(funs)) (args : vec (elem M1.(domain)) (Σ.(farity) f Hf)), _ =@{elem M2.(domain)} _).
+    refine (elem_subseteq _ _ H (M1.(interp_fun) f Hf args)).
+    refine (M2.(interp_fun) f Hf (elem_subseteq_vec _ _ H _ args)).
+  * refine (∀ (p : name) (Hp : p ∈ Σ.(preds)) (args : vec (elem M1.(domain)) (Σ.(parity) p Hp)), impl _ _).
+    refine (args ∈ M1.(interp_pred) p Hp).
+    refine ((elem_subseteq_vec _ _ H _ args) ∈ M2.(interp_pred) p Hp).
 Defined.
+
+(** * Term evaluation in a given pre-model *) 
 
 Section Eval.
 
@@ -132,20 +168,28 @@ with tapply_eval (e : eval) (t : term) (H : twf t) {struct H} : dom :=
 
 End Eval.
 
+(** * A Kripke model is a pre-order with pre-models at each node, with pre-model
+      inclusion respecting the pre-order *)
+
 Definition monotone {A B : Type} (RA : relation A) (RB : relation B) (f : A -> B) :=
   ∀ x y, RA x y -> RB (f x) (f y).
 
-Class KStruct (D : Type) : Type := {
+Class KModel (D : Type) : Type := {
   world : Type;
   accessible : relation world;
-  accessible_po : PartialOrder accessible;
+  accessible_po : PreOrder accessible;
   model : world -> premodel D;
   model_mono : monotone accessible premodel_incl model;
 }.
 
 Infix "≤" := accessible.
 
-Context {D} (K : KStruct D).
+(** * Given a Kripke model K, a world α ∈ K and an evaluation e in the domain of
+      α, forcing evaluates a flower into a (Coq) proposition. *)
+
+Section Forcing.
+
+Context {D} {K : KModel D}.
 
 Lemma eval_incl {α β} :
   α ≤ β -> eval (model α) -> eval (model β).
@@ -182,7 +226,7 @@ where "α : e ⊩f ϕ" := (forces α e ϕ)
   and "α : e ⊩p Δ" := (pforces α e Δ). *)
 
 Reserved Notation "α : e ⊩f ϕ ! H" (at level 20, e at level 0).
-Reserved Notation "α : e ⊩ Φ ! H" (at level 20, e at level 0).
+Reserved Notation "α : e ⊩b Φ ! H" (at level 20, e at level 0).
 Reserved Notation "α : e ⊩p Δ ! H" (at level 20, e at level 0).
 
 Fixpoint fforces (α : world) (e : eval (model α)) (ϕ : flower) (H : fwf ϕ) : Prop :=
@@ -192,15 +236,15 @@ Fixpoint fforces (α : world) (e : eval (model α)) (ϕ : flower) (H : fwf ϕ) :
   | fwf_flower n Φ Δ HΦ HΔ =>
       ∀ β (H : α ≤ β), ∀ (en : eval (model β)),
       let e' := update (model β) n en (eval_incl H e) in
-      β : e' ⊩ Φ ! HΦ -> β : e' ⊩p Δ ! HΔ
+      β : e' ⊩b Φ ! HΦ -> β : e' ⊩p Δ ! HΔ
   end
 
-with forces (α : world) (e : eval (model α)) (Φ : bouquet) (H : wf Φ) : Prop :=
+with bforces (α : world) (e : eval (model α)) (Φ : bouquet) (H : wf Φ) : Prop :=
   match H with
   | wf_nil =>
       True
   | wf_cons ϕ Φ Hϕ HΦ =>
-      α : e ⊩f ϕ ! Hϕ /\ α : e ⊩ Φ ! HΦ
+      α : e ⊩f ϕ ! Hϕ /\ α : e ⊩b Φ ! HΦ
   end
 
 with pforces (α : world) (e : eval (model α)) (Δ : list garden) (H : pwf Δ) : Prop :=
@@ -208,17 +252,25 @@ with pforces (α : world) (e : eval (model α)) (Δ : list garden) (H : pwf Δ) 
   | pwf_nil =>
       False
   | pwf_cons n Φ Δ HΦ HΔ =>
-      (∃ (en : eval (model α)), α : (update (model α) n en e) ⊩ Φ ! HΦ) \/
+      (∃ (en : eval (model α)), α : (update (model α) n en e) ⊩b Φ ! HΦ) \/
       α : e ⊩p Δ ! HΔ
   end
 
 where "α : e ⊩f ϕ ! H" := (fforces α e ϕ H)
-  and "α : e ⊩ Φ ! H" := (forces α e Φ H)
+  and "α : e ⊩b Φ ! H" := (bforces α e Φ H)
   and "α : e ⊩p Δ ! H" := (pforces α e Δ H).
 
-Definition entails (Φ Ψ : wfbouquet) :=
-  let '(existT Φ HΦ) := Φ in
-  let '(existT Ψ HΨ) := Ψ in
-  ∀ α e, α : e ⊩ Φ ! HΦ -> α : e ⊩ Ψ ! HΨ.
+Definition forces α e (T : theory) :=
+  ∀ ϕ, ϕ ∈ T -> let 'ϕ ⇂ H := ϕ in α : e ⊩f ϕ ! H.
+
+Notation "α : e ⊩ T" := (forces α e T) (at level 20, e at level 0).
+
+Definition entails (T U : theory) :=
+  ∀ α e, α : e ⊩ T -> α : e ⊩ U.
+
+Definition eqentails T U := entails T U /\ entails U T.
+
+End Forcing.
 
 Infix "⊨" := entails (at level 40).
+Infix "⫤⊨" := eqentails (at level 40).

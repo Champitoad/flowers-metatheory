@@ -22,6 +22,8 @@ Ltac eq_decide x y :=
 
 (** * Logic *)
 
+Notation "x ⇂ p" := (existT x p) (at level 20) : stdpp_scope.
+
 Lemma contrapose {A B : Prop} :
   (A -> B) -> (~ B -> ~ A).
 Proof.

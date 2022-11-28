@@ -996,7 +996,7 @@ Proof.
 Admitted.
 
 Add Morphism cinterp with signature
-  Forall2 eqderiv ==> eqprov
+  Forall2 Semantics.eqderiv ==> eqprov
   as proper_cinterp_eqprov.
 Proof.
   move => Γ Γ' H.

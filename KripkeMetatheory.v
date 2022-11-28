@@ -3,24 +3,65 @@ Require Import Classical.
 
 Require Import Flowers.Syntax Flowers.KripkeSemantics Flowers.Utils.
 
-Definition theory : Type := propset flower.
+Context (Σ : sig).
 
-Definition bouquet_to_theory (Φ : bouquet) : theory :=
-  {| propset_car := λ ϕ, In ϕ Φ |}.
+(** * Soundness *)
 
-Coercion bouquet_to_theory : bouquet >-> theory.
+Section Soundness.
 
-Definition tentails (T : theory) (Ψ : bouquet) :=
-  ∃ Φ, (bouquet_to_theory Φ) ⊆ T /\ Φ ⊢ Ψ.
+Theorem soundness (ϕ : wfflower) :
+  sprov ϕ -> ∀ A (K : KModel A), ∅ ⊨ ϕ.
+Proof.
+Admitted.
 
-Definition tnentails (T : theory) (Ψ : bouquet) :=
-  ∀ Φ, (bouquet_to_theory Φ) ⊆ T -> ~ Φ ⊢ Ψ.
+End Soundness.
 
-Infix "!⊢" := tentails (at level 70).
-Infix "!⊬" := tnentails (at level 70).
+(** * Completeness *)
 
-Definition consistent (Θ : bouquet) (T : theory) :=
-  T !⊬ Θ.
+Section Completeness.
 
-Definition complete (Θ : bouquet) (T : theory) :=
-  ∀ Φ, T ∪ Φ !⊢ Θ \/ Φ ⊂ T.
+Definition tderiv (T : theory) (ϕ : wfflower) :=
+  ∃ (Φ : wfbouquet), btot Φ ⊆ T /\ let 'Φ ⇂ _ := Φ in Φ ⊢ ϕ.
+
+Definition tnderiv (T : theory) (ϕ : wfflower) :=
+  ∀ (Φ : wfbouquet), btot Φ ⊆ T -> let 'Φ ⇂ _ := Φ in ~ (Φ ⊢ ϕ).
+
+Infix "!⊢" := tderiv (at level 70).
+Infix "!⊬" := tnderiv (at level 70).
+
+Definition consistent (ϕ : wfflower) (T : theory) :=
+  T !⊬ ϕ.
+
+Definition complete (ϕ : wfflower) (T : theory) :=
+  ∀ (ψ : wfflower), T ∪ ψ !⊢ ϕ \/ ψ ∈ T.
+
+Lemma completeness_contra T ϕ :
+  T !⊬ ϕ -> ∃ A (K : KModel A), ~ (T ⊨ ϕ).
+Admitted.
+
+Lemma contra_recip (P Q : Prop) :
+  (~ Q -> ~ P) -> P -> Q.
+Proof.
+  tauto.
+Qed.
+
+Lemma not_prov_tnderiv (ϕ : wfflower) :
+  ~ prov ϕ -> ∅ !⊬ ϕ.
+Admitted.
+
+Theorem completeness (ϕ : wfflower) :
+  (∀ A (K : KModel A), ∅ ⊨ ϕ) -> prov ϕ.
+Proof.
+  apply contra_recip. move => H H'. apply not_prov_tnderiv in H.
+  apply completeness_contra in H. move: H => [A' [K' H]].
+  apply H. apply H'.
+Qed.
+
+End Completeness.
+
+Theorem structural_admissibility (ϕ : wfflower) :
+  sprov ϕ -> prov ϕ.
+Proof.
+  intros. apply completeness. intros.
+  by apply soundness.
+Qed.

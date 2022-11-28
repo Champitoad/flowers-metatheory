@@ -22,7 +22,7 @@ Coercion ftob : flower >-> bouquet.
 Definition btog : bouquet -> garden := λ Φ, (0, Φ).
 Coercion btog : bouquet >-> garden.
 
-Notation "∅" := (0, nil).
+#[global] Instance empty_garden : Empty garden := (0, nil).
 Notation "n ⋅ Φ" := (n, Φ) (format "n  ⋅  Φ", at level 63).
 
 Notation "γ ⫐ Δ" := (Flower γ Δ) (at level 65).
@@ -1058,23 +1058,23 @@ Proof.
   exact IH.
 Qed.
 
-Definition entails (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
-Definition sentails (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+Definition deriv (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+Definition sderiv (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
 
-Infix "⊢" := entails (at level 70).
-Infix "⊢s" := sentails (at level 70).
+Infix "⊢" := deriv (at level 70).
+Infix "⊢s" := sderiv (at level 70).
 
-Lemma entails_sentails Φ Ψ :
+Lemma deriv_sderiv Φ Ψ :
   Φ ⊢ Ψ -> Φ ⊢s Ψ.
 Proof.
   by apply cstep_gstep.
 Qed.
 
-Definition eqentails Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
-Definition eqsentails Φ Ψ := (Φ ⊢s Ψ) /\ (Ψ ⊢s Φ).
+Definition eqderiv Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
+Definition eqsderiv Φ Ψ := (Φ ⊢s Ψ) /\ (Ψ ⊢s Φ).
 
-Infix "⊣⊢" := eqentails (at level 70).
-Infix "⊣s⊢" := eqsentails (at level 70).
+Infix "⊣⊢" := eqderiv (at level 70).
+Infix "⊣s⊢" := eqsderiv (at level 70).
 
 Lemma cut Φ Ψ :
   Ψ ≈>* Φ ++ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]].
@@ -1095,7 +1095,7 @@ Proof.
   rewrite bshift_zero. reflexivity.
 Qed.
 
-Lemma eqsentails_eqsprov Φ Ψ :
+Lemma eqsderiv_eqsprov Φ Ψ :
   Φ ⊣s⊢ Ψ -> Φ ≣ Ψ.
 Proof.
   move => [H1 H2].
@@ -1113,10 +1113,10 @@ Proof.
     list_simplifier. apply H.
 Qed.
 
-(* Global Instance sentails_po : PreOrder sentails.
+(* Global Instance sderiv_po : PreOrder sderiv.
 Proof.
   econs; red.
-  * move => Φ. apply entails_sentails. red.
+  * move => Φ. apply deriv_sderiv. red.
     pose proof (Hpol := R_pol Φ 0 (Petal (0 ⋅ Φ) [] 0 □ [])).
     rewrite /= bshift_zero in Hpol. red.
     estep. rself. eapply Hpol.
@@ -1124,7 +1124,7 @@ Proof.
     exact Hp.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
-  * rewrite /sentails. move => Φ1 Φ2 Φ3 H1 H2.
+  * rewrite /sderiv. move => Φ1 Φ2 Φ3 H1 H2.
     admit.
 Admitted. *)
 
@@ -1133,7 +1133,7 @@ Admitted. *)
 Theorem deduction Φ Ψ :
   Φ ⊢ Ψ <-> [] ⊢ 0 ⋅ Φ ⫐ [0 ⋅ Ψ].
 Proof.
-  split; rewrite /entails; move => H; red in H |- *.
+  split; rewrite /deriv; move => H; red in H |- *.
   * rctxmH [0;1] H.
     rpetm (@nil nat) (@nil garden) (@nil garden).
     reflexivity.
