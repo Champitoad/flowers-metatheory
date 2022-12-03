@@ -12,6 +12,7 @@ Inductive flower :=
 
 Definition garden : Type := nat * list flower.
 Definition bouquet := list flower.
+Definition petals := list garden.
 
 Definition ftog : flower -> garden := λ ϕ, (0, [ϕ]).
 Coercion ftog : flower >-> garden.
@@ -64,6 +65,44 @@ Definition flower_induction	:
   ∀ (ϕ : flower), P ϕ.
 Proof.
   intros. eapply flower_induction_full; eauto.
+  exact (λ _, I).
+Qed.
+
+Definition flower_recursion_full :
+  ∀ (P : flower -> Type)
+    (Pt : term -> Type),
+  let Pγ '(n ⋅ Φ) := ForallT P Φ in
+  ∀ (IHt : ∀ (t : term), Pt t)
+    (IHatom : ∀ p args, ForallT Pt args -> P (Atom p args))
+    (IHflower : ∀ (γ : garden) (Δ : list garden),
+      Pγ γ -> ForallT Pγ Δ -> P (γ ⫐ Δ))
+    (IHgarden : ∀ (n : nat) (Φ : bouquet),
+      ForallT P Φ -> Pγ (n ⋅ Φ)),
+  ∀ (ϕ : flower), P ϕ.
+Proof.
+  intros. move: ϕ. fix IH 1. induction ϕ.
+  * apply IHatom. apply In_ForallT. intros. by apply IHt.
+  * apply IHflower.
+    - case: γ => n Φ.
+      apply IHgarden.
+      elim: Φ => [|ϕ Φ IHΦ]; constructor.
+      apply IH. exact IHΦ.
+    - elim: Δ => [|δ Δ IHΔ]; constructor.
+      case δ => n Φ. apply IHgarden.
+      elim: Φ => [|ϕ Φ IHΦ]; constructor.
+      apply IH. exact IHΦ.
+      exact IHΔ.
+Qed.
+
+Definition flower_recursion	:
+  ∀ (P : flower -> Type),
+  let Pγ '(n ⋅ Φ) := ForallT P Φ in
+  ∀ (IHatom : ∀ p args, P (Atom p args))
+    (IHflower : ∀ (γ : garden) (Δ : list garden),
+      Pγ γ -> ForallT Pγ Δ -> P (γ ⫐ Δ)),
+  ∀ (ϕ : flower), P ϕ.
+Proof.
+  intros. eapply flower_recursion_full; eauto.
   exact (λ _, I).
 Qed.
 

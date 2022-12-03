@@ -73,17 +73,20 @@ Proof.
   move => p. destruct p. auto.
 Qed.
 
-Lemma cons_length_inv {A} (l : list A) (n : nat) :
-  length l = S n -> { x & { l' & l = x :: l' } }.
-Admitted.
-
 Definition forallb (l : list bool) :=
   foldr andb true l.
 
-Lemma forallb_fmap {A} (P : A -> bool) (l : list A) :
-  forallb (P <$> l) ->
-  ∀ x, x ∈ l -> P x.
-Admitted.
+Inductive ForallT {A} (P : A -> Type) : list A -> Type :=
+| ForallT_nil : ForallT P []
+| ForallT_cons x l : P x -> ForallT P l -> ForallT P (x :: l).
+
+Lemma In_ForallT {A} (P : A -> Type) : ∀ (l : list A),
+  (∀ x : A, In x l -> P x) -> ForallT P l.
+Proof.
+  elim => [|a l IH] H; constructor.
+  apply H. by left.
+  apply IH. move => y Hy. apply H. by right.
+Qed.
 
 Ltac solve_elem_of_list :=
   match goal with
