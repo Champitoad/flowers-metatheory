@@ -71,25 +71,109 @@ Definition wfflower :=
 Definition wfbouquet :=
   { Φ : bouquet & wf Φ }.
 
+Definition wfctx :=
+  { X : ctx & wf X }.
+
+Definition wfpctx :=
+  { P : pctx & wf P }. 
+
 Definition ffgt : wfflower -> flower := projT1.
 Definition bfgt : wfbouquet -> bouquet := projT1.
+Definition cfgt : wfctx -> ctx := projT1.
+Definition pfgt : wfpctx -> pctx := projT1.
 Coercion ffgt : wfflower >-> flower.
 Coercion bfgt : wfbouquet >-> bouquet.
+Coercion cfgt : wfctx >-> ctx.
+(* Coercion pfgt : wfpctx >-> pctx. *)
+
+Definition wfpctx_to_wfctx : wfpctx -> wfctx := λ '(P ⇂ H), (pctx_to_ctx P) ⇂ H.
+Coercion wfpctx_to_wfctx : wfpctx >-> wfctx.
+
+Lemma wf_app (Φ Ψ : bouquet) :
+  wf Φ -> wf Ψ -> wf (Φ ++ Ψ).
+Proof.
+  elim => {Φ} [|ϕ Φ Hϕ HΦ IH] H //=.
+  econs.
+Qed.
+
+Lemma pwf_app (Γ Δ : list garden) :
+  pwf Γ -> pwf Δ -> pwf (Γ ++ Δ).
+Proof.
+  elim => {Γ} [|γ Γ Hγ HΓ IH] H //=.
+  econs.
+Qed.
+
+Lemma wf_app_inv : ∀ (Φ Ψ : bouquet),
+  wf (Φ ++ Ψ) -> wf Φ * wf Ψ.
+Proof.
+  elim => [|ϕ Φ IH] /= Ψ H; split.
+  econs. done.
+  econs. inv H.
+  inv H. by apply (IH Ψ).
+  inv H. by apply (IH Ψ).
+Qed.
+
+Lemma pwf_app_inv : ∀ (Γ Δ : list garden),
+  pwf (Γ ++ Δ) -> pwf Γ * pwf Δ.
+Proof.
+  elim => [|γ Γ IH] /= Δ H; split.
+  econs. done. destruct γ as [n Φ].
+  econs. inv H.
+  inv H. by apply (IH Δ).
+  inv H. by apply (IH Δ).
+Qed.
+
+Lemma wf_Planter_inv {X : ctx} {Φl Φr} :
+  wf (Planter Φl X Φr) -> wf Φl * wf X * wf Φr.
+Proof.
+  cbn. move => H.
+  case (wf_app_inv _ _ H) => {H} [Hl H];
+  case (wf_app_inv _ _ H) => {H} [HX Hr].
+  done.
+Qed.
+
+Lemma wf_Pistil_inv {X : ctx} {n Δ} :
+  wf (Pistil n X Δ) -> wf X * pwf Δ.
+Proof.
+  cbn. move => H. inv H. inv X0. done.
+Qed.
+
+Lemma wf_Petal_inv {X : ctx} {n Φ Δ m Δ'} :
+  wf (Petal (n ⋅ Φ) Δ m X Δ') -> wf Φ * pwf Δ * wf X * pwf Δ'.
+Proof.
+  cbn. move => H. inv H. inv X0.
+  case (pwf_app_inv _ _ X3) => HΔ H. rewrite cons_app in H.
+  case (pwf_app_inv _ _ H) => HX HΔ'. inv HX.
+  done.
+Qed.
+
+Lemma wf_fill : ∀ (X : wfctx) (Φ : wfbouquet),
+  wf (X ⋖ Φ).
+Proof.
+  move => []/=.
+  elim => [|Φl X IH Φr |n X IH Δ |γ Δ n X IH Δ'] H [Φ HΦ] //=.
+
+  case (wf_Planter_inv H); move => [Hl HX] Hr.
+  repeat apply wf_app. done. by apply (IH HX (Φ ⇂ HΦ)). done.
+
+  case (wf_Pistil_inv H); move => HX HΔ.
+  econs; econs. apply (IH HX (Φ ⇂ HΦ)).
+
+  destruct γ as [m Ψ].
+  case (wf_Petal_inv H); move => [[HΨ HΔ] HX] HΔ'.
+  econs; econs. rewrite cons_app. repeat apply pwf_app.
+  done. econs. apply (IH HX (Φ ⇂ HΦ)). econs. done.
+Qed.
 
 (** ** Theories are sets of well-formed flowers *)
 
 Definition theory := propset wfflower.
 
-Definition ftot (ϕ : wfflower) : theory := {[ ϕ ]}.
+Definition ftot (ϕ : wfflower) : theory :=
+  {[ ϕ ]}.
 
 Definition btot (Φ : wfbouquet) : theory :=
-  let fix aux Φ (HΦ : wf Φ) {struct HΦ} : propset wfflower :=
-    match HΦ with
-    | wf_nil => propset_empty
-    | wf_cons ϕ Φ Hϕ HΦ => {[ ψ | ψ = ϕ ⇂ Hϕ \/ ψ ∈ aux Φ HΦ ]}
-    end in
-  let 'Φ ⇂ HΦ := Φ in
-  aux Φ HΦ.
+  {[ ϕ | ffgt ϕ ∈ bfgt Φ ]}.
 
 #[global] Coercion ftot : wfflower >-> theory.
 #[global] Coercion btot : wfbouquet >-> theory.
@@ -269,6 +353,18 @@ Definition entails (T U : theory) :=
   ∀ α e, α : e ⊩ T -> α : e ⊩ U.
 
 Definition eqentails T U := entails T U /\ entails U T.
+
+#[export] Instance equiv_eqentails : Equivalence eqentails.
+Proof.
+  econs; repeat red.
+  * move => A. split; done.
+  * move => A B [HAB HBA]; done.
+  * move => A B C [HAB HBA] [HBC HCB]. split; red; intros.
+    apply HBC. by apply HAB.
+    apply HBA. by apply HCB.
+Qed.
+
+#[export] Instance : Equiv wfbouquet := eqentails.
 
 End Forcing.
 

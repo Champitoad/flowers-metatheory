@@ -287,6 +287,9 @@ Fixpoint fill (Ψ : bouquet) (X : ctx) : bouquet :=
   end
 where "X ⋖ Ψ" := (fill Ψ X).
 
+Definition btoc X := X ⋖ [].
+Coercion btoc : ctx >-> bouquet.
+
 Reserved Infix "⪡" (at level 15).
 
 Fixpoint comp (X : ctx) (Y : ctx) : ctx :=
