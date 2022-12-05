@@ -31,6 +31,9 @@ Proof.
   exact (fun _ => I).
 Qed.
 
+Inductive cst : term -> Prop :=
+| cst_fun f args : Forall cst args -> cst (TFun f args).
+
 Fixpoint tclosed (c : nat) (t : term) : bool :=
   match t with
   | TVar n => n <? c

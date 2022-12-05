@@ -507,6 +507,153 @@ Proof.
   by apply pollin_comp_out.
 Qed.
 
+(** *** Assumptions scattered in a context *)
+
+Definition is_shifted (n : nat) (ϕ : flower) : Prop :=
+  exists ψ, ϕ = shift n 0 ψ.
+
+Definition subctx (Φ : bouquet) (X : ctx) : Prop :=
+  forall ϕ, ϕ ∈ Φ -> exists n, is_shifted n ϕ /\ nassum n ϕ X.
+
+Infix "⪽" := subctx (at level 70).
+
+Lemma is_shifted_zero ϕ :
+  is_shifted 0 ϕ.
+Proof.
+  exists ϕ. by rewrite shift_zero.
+Qed.
+
+Lemma is_shifted_shift_unshift n ϕ :
+  is_shifted n ϕ ->
+  shift n 0 (unshift n 0 ϕ) = ϕ.
+Proof.
+  move => H.
+  case: H => [B H]. rewrite H.
+  by rewrite (unshift_shift _ 0) unshift_zero.
+Qed.
+
+Lemma subctx_nil X :
+  [] ⪽ X.
+Proof.
+  red. move => ϕ Hϕ. inv Hϕ.
+Qed.
+
+Lemma subctx_singl X (ϕ : flower) :
+  ϕ ⪽ X -> ∃ n, is_shifted n ϕ /\ nassum n ϕ X.
+Proof.
+  move => H. red in H.
+  case (H ϕ (elem_of_singl ϕ)) => {H}.
+  firstorder.
+Qed.
+
+Lemma subctx_comp_out Φ X Y :
+  Φ ⪽ X ->
+  (shift (bv Y) 0 <$> Φ) ⪽ X ⪡ Y.
+Proof.
+  rewrite /subctx.
+  move => H ϕ Hϕ.
+  apply elem_of_map in Hϕ.
+  case: Hϕ => [E [HE1 HE2]].
+  case (H E HE1) => m [Hshift Hassum].
+  exists (m + bv Y). split.
+  { red. case: Hshift => F ?; subst.
+    exists F. by rewrite -shift_add Nat.add_comm. }
+  pose proof (Hass := nassum_comp_out _ _ X Y Hassum).
+  rewrite HE2.
+  by rewrite /= in Hass.
+Qed.
+
+Ltac subctxout H :=
+  match goal with
+  | |- _ ⪽ _ ⪡ ?Y =>
+      let Hsub := fresh "Hsub" in
+      pose proof (Hsub := subctx_comp_out _ _ Y H);
+      rewrite /= in Hsub;
+      repeat rewrite fmap_app in Hsub;
+      repeat rewrite bshift_zero in Hsub;
+      done
+  end.
+
+Lemma subctx_comp_in Φ X Y :
+  Φ ⪽ Y ->
+  Φ ⪽ X ⪡ Y.
+Proof.
+  rewrite /subctx.
+  move => H ϕ Hϕ.
+  case (H ϕ Hϕ) => n [Hs Ha].
+  exists n. split; auto.
+  by apply nassum_comp_in.
+Qed.
+
+Lemma subctx_subset Φ Φ' X :
+  Φ ⊆ Φ' -> Φ' ⪽ X -> Φ ⪽ X.
+Proof.
+  rewrite /subctx.
+  move => Hsubset H ϕ Hϕ.
+  case (H ϕ (Hsubset ϕ Hϕ)) => n Ha.
+  by exists n.
+Qed.
+
+Lemma subctx_app Φ Φ' X :
+  Φ ⪽ X -> Φ' ⪽ X ->
+  (Φ ++ Φ') ⪽ X.
+Proof.
+  rewrite /subctx.
+  move => H H' ϕ Hϕ.
+  decompose_elem_of_list.
+  * case (H ϕ H0) => n Ha. by exists n.
+  * case (H' ϕ H0) => n Ha. by exists n.
+Qed.
+
+Global Instance subctx_Permutation :
+  Proper ((≡ₚ) ==> (=) ==> (↔)) (subctx).
+Proof.
+  repeat red. move => Φ Φ' Hperm X Y Heq; subst.
+  rewrite /subctx. split; move => H ϕ Hϕ.
+  * rewrite -Hperm in Hϕ. by apply H.
+  * rewrite Hperm in Hϕ. by apply H.
+Qed.
+
+Lemma move_cons_right {A} (l l' : list A) (x : A) :
+  l ++ x :: l' ≡ₚ (l ++ l') ++ [x].
+Proof.
+  by solve_Permutation.
+Qed.
+
+Lemma subctx_petal_skip A X γ Δ Δ' :
+  [A] ⪽ X ->
+  [A] ⪽ Petal γ Δ 0 X Δ'.
+Proof.
+  move => H.
+  by apply (subctx_comp_in _ (Petal γ Δ 0 □ Δ') _ H).
+Qed.
+
+Lemma subctx_petal Φ n Φl Φr Δ Δ' :
+  Φ ⪽ Petal (n ⋅ Φl ++ Φ ++ Φr) Δ 0 □ Δ'.
+Proof.
+  move => ϕ Hϕ; move: Hϕ Φl Φr.
+  elim => {ϕ Φ} [ϕ Φ |ϕ ψ Φ Hϕ IH] Φl Φr.
+  * exists 0. split; [> by apply is_shifted_zero |].
+    red. rewrite bunshift_zero.
+    exists □. exists (Petal (n ⋅ Φl ++ (ϕ :: Φ) ++ Φr) Δ 0 □ Δ').
+    split; auto.
+    epose proof (Hp := P_self ϕ □ _ Φl (Φ ++ Φr) _ 0 _).
+    eapply Hp.
+  * case (IH (Φl ++ [ψ]) Φr) => {IH} m [Hshift Hassum].
+    rewrite -app_assoc/= in Hassum.
+    exists m. split; auto.
+Qed.
+
+Ltac subctxpet Φl Φr Δ Δ' :=
+  let Hs := fresh "Hs" in
+  epose proof (Hs := subctx_petal _ _ Φl Φr Δ Δ');
+  list_simplifier; eapply Hs.
+
+Ltac apply_deriv H X X0 :=
+  specialize (H (X ⪡ X0));
+  repeat rewrite -fill_comp /= in H;
+  etransitivity; [> apply H |].
+
 (** ** Local rules *)
 
 Reserved Infix "⇀" (at level 80).
@@ -582,6 +729,8 @@ where "Φ ~> Ψ" := (cstep Φ Ψ).
 (** ** Transitive closure *)
 
 Infix "~>*" := (rtc cstep) (at level 80).
+
+#[export] Hint Extern 1 (rtc _ _ _) => reflexivity : core.
 
 Notation "Φ <~> Ψ" := (Φ ~>* Ψ /\ Ψ ~>* Φ) (at level 80).
 
@@ -1066,7 +1215,12 @@ Ltac rpet Δ Δ' :=
 
 Ltac rpetm p Δ Δ' :=
   rcstepm p (@nil flower); [> rpet Δ Δ' |].
-  
+
+Ltac bypet Δ Δ' :=
+  repeat rewrite fill_comp; eapply cstep_congr;
+  rpetm (@nil nat) Δ Δ';
+  reflexivity.
+
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
 (** * Provability *)
@@ -1089,9 +1243,7 @@ Proof.
   etransitivity; eauto.
 Qed.
 
-Definition pflower n Φ Ψ := n ⋅ Φ ⫐ [0 ⋅ Ψ].
-
-Lemma cstep_gstep Φ Ψ :
+Lemma cstep_sstep Φ Ψ :
   Φ ~>* Ψ -> Φ ≈>* Ψ.
 Proof.
   elim => [Φ1 |Φ1 Φ2 Φ3 Hstep _ IH]. reflexivity.
@@ -1100,8 +1252,8 @@ Proof.
   exact IH.
 Qed.
 
-Definition deriv (Φ Ψ : bouquet) := prov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
-Definition sderiv (Φ Ψ : bouquet) := sprov (0 ⋅ Φ ⫐ [0 ⋅ Ψ]).
+Definition deriv (Φ Ψ : bouquet) := ∀ X, Φ ⪽ X -> X ⋖ Ψ ~>* X ⋖ [].
+Definition sderiv (Φ Ψ : bouquet) := ∀ X, Φ ⪽ X -> X ⋖ Ψ ≈>* X ⋖ [].
 
 Infix "⊢" := deriv (at level 70).
 Infix "⊢s" := sderiv (at level 70).
@@ -1109,7 +1261,17 @@ Infix "⊢s" := sderiv (at level 70).
 Lemma deriv_sderiv Φ Ψ :
   Φ ⊢ Ψ -> Φ ⊢s Ψ.
 Proof.
-  by apply cstep_gstep.
+  intros; red; intros.
+  by apply cstep_sstep.
+Qed.
+
+Lemma prov_deriv Φ :
+  prov Φ <-> [] ⊢ Φ.
+Proof.
+  rewrite /prov/deriv.
+  split; move => H.
+  * move => X HX. by apply cstep_congr.
+  * apply (H □). red. intros ? Hϕ. inv Hϕ.
 Qed.
 
 Definition eqderiv Φ Ψ := (Φ ⊢ Ψ) /\ (Ψ ⊢ Φ).
@@ -1146,14 +1308,14 @@ Proof.
   * etransitivity. eapply (cut Φ).
     etransitivity.
     epose proof (Hc := sstep_congr (PPlanter Φ PHole []) [0 ⋅ Φ ⫐ [0 ⋅ Ψ]] _).
-    list_simplifier. eapply Hc. eapply H1.
-    list_simplifier. apply H.
+    list_simplifier. eapply Hc.
+    admit. admit.
   * etransitivity. eapply (cut Ψ).
     etransitivity.
     epose proof (Hc := sstep_congr (PPlanter Ψ PHole []) [0 ⋅ Ψ ⫐ [0 ⋅ Φ]] _).
-    list_simplifier. eapply Hc. eapply H2.
-    list_simplifier. apply H.
-Qed.
+    list_simplifier. eapply Hc.
+    admit. admit.
+Admitted.
 
 (* Global Instance sderiv_po : PreOrder sderiv.
 Proof.
@@ -1172,12 +1334,53 @@ Admitted. *)
 
 (** ** Deduction *)
 
+Lemma subcopol : ∀ Φ X,
+  Φ ⪽ X ->
+  X ⋖ [] ~>* X ⋖ Φ.
+Proof.
+  elim => [|ϕ Φ IH] X H //.
+  etransitivity. apply IH.
+  apply (subctx_subset _ (ϕ :: Φ)); auto. by right.
+
+  apply (subctx_subset ϕ) in H.
+  2: { red. red. intros. rewrite cons_app. solve_elem_of_list. }
+  case (subctx_singl _ _ H) => {H} n [Hshift [Y [Z [Hpol ?]]]]; subst.
+  rewrite -fill_comp/=.
+  
+  estep. apply R_ctx.
+  set X0 := Planter [] □ Φ.
+  epose proof (Hp := R_copol (unshift n 0 ϕ) n (Z ⪡ X0)).
+  repeat rewrite -fill_comp/= in Hp. eapply Hp.
+  rewrite fmap_singl in Hpol. rewrite /ftob.
+  epose proof (Hp' := pollin_comp_out _ _ _ X0).
+  rewrite /= Nat.add_0_r in Hp'. by eapply Hp'.
+
+  rewrite is_shifted_shift_unshift. done.
+  by rewrite -fill_comp.
+Qed.
+
+Lemma subcopolepis X Φ Ψ :
+  Φ ⪽ X ->
+  X ⋖ Ψ ~>* X ⋖ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]]. 
+Proof.
+  move => H.
+  estep. apply R_ctx. apply R_coepis.
+  set Y := Pistil 0 □ [0 ⋅ Ψ].
+  epose proof (Hp := subcopol _ (X ⪡ Y)).
+  repeat rewrite -fill_comp/= in Hp. eapply Hp.
+  subctxout H.
+Qed.
+
 Theorem deduction Φ Ψ :
   Φ ⊢ Ψ <-> [] ⊢ 0 ⋅ Φ ⫐ [0 ⋅ Ψ].
 Proof.
-  split; rewrite /deriv; move => H; red in H |- *.
-  * rctxmH [0;1] H.
-    rpetm (@nil nat) (@nil garden) (@nil garden).
-    reflexivity.
-  * estep. rself. apply R_coepis. done.
+  split; move => H X HX.
+  * set Y := Petal (0 ⋅ Φ) [] 0 □ [].
+    apply_deriv H X Y.
+    { apply subctx_comp_in.
+      subctxpet (@nil flower) (@nil flower) (@nil garden) (@nil garden). }
+    bypet (@nil garden) (@nil garden).
+  * specialize (H X (subctx_nil X)).
+    etransitivity; [> |eapply H].
+    by apply subcopolepis.
 Qed.

@@ -1,6 +1,6 @@
 Require Import ssreflect.
 Require Import String.
-Require Import stdpp.list stdpp.vector stdpp.relations.
+Require Import stdpp.list stdpp.propset stdpp.vector stdpp.relations.
 
 (** Names *)
 
@@ -67,6 +67,14 @@ Qed.
 
 (** * Lists *)
 
+Lemma equiv_nil {A} : ∀ (l : list A),
+  l ≡@{list A} [] -> l = [].
+Proof.
+  elim => [|x l IH] H //. red in H. rewrite /set_equiv_instance in H.
+  assert (Hx : x ∈ x :: l) by left.
+  case (H x) => [H' _]. pose proof (H'' := H' Hx). inv H''.
+Qed.
+
 Lemma vec_resize {A n m} :
   n = m -> vec A n -> vec A m.
 Proof.
@@ -96,6 +104,12 @@ Ltac solve_elem_of_list :=
   | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
   | |- ?x ∈ ?l => by auto
   end.
+
+Lemma elem_of_singl {A} (x : A) :
+  x ∈ [x].
+Proof.
+  econs.
+Qed.
 
 Lemma elem_of_map {A B : Type} (f : A -> B) (l : list A) (y : B) :
   y ∈ f <$> l <->
@@ -351,4 +365,33 @@ Proof.
   elim => [|x l IHl]; list_simplifier; try done.
   move => l'; rewrite IHl.
   elim: l' => [|x' l' IHl']; list_simplifier; try done.
+Qed.
+
+(** * Sets *)
+
+Definition elem {A C} `{Set_ A C} (X : C) :=
+  { x | x ∈ X }.
+
+Definition elem_subseteq {A : Type} {X Y : propset A} :
+  X ⊆ Y -> elem X -> elem Y.
+Proof.
+  move => H [x Hx]. exists x. exact (H x Hx).
+Defined.
+
+Definition elem_subseteq_list {A : Type} {X Y : propset A}
+    (H : X ⊆ Y) (l : list (elem X)) : list (elem Y) :=
+  (λ '(x ↾ Hx), x ↾ H x Hx) <$> l.
+
+Lemma list_elem_Forall {A} {P : A -> Prop} : ∀ (l : list (elem {[ x | P x ]})),
+  Forall P (proj1_sig <$> l).
+Proof.
+  elim => [|x l IH] //=.
+  econs. case: x => x Hx. apply Hx.
+Qed.
+
+Lemma proj1_elem_subseteq_list {A} {X Y : propset A} (H : X ⊆ Y) (l : list (elem X)) :
+  proj1_sig <$> (elem_subseteq_list H l) = proj1_sig <$> l.
+Proof.
+  rewrite /elem_subseteq_list -list_fmap_compose.
+  apply eq_fmap. by case.
 Qed.

@@ -1016,22 +1016,13 @@ Proof.
   pose proof (Hiso := interp_weak_iso (0 ⋅ Φ ⫐ [0 ⋅ Ψ])).
   rewrite [⌊[_]⌋]/= false_or/= finterp_And finterp_And in Hiso.
   repeat rewrite finterp_interp in H. red in H.
-  rewrite /ftob Hiso in H.
-  apply deduction in H.
-  by apply deduction.
-Qed.
+Admitted.
 
 Theorem structural_admissibility Φ Ψ :
   Φ ⊢s Ψ -> Φ ⊢ Ψ.
 Proof.
   move => H. red in H.
-  apply ssoundness in H.
-  rewrite /interp/= true_and false_or in H.
-  apply Semantics.structural_admissibility in H.
-  apply completeness in H. rewrite /= in H.
-  apply deduction in H.
-  by apply interp_entails.
-Qed.
+Admitted.
 
 (** * Semantical adequation *)
 
@@ -1111,11 +1102,7 @@ Theorem weak_structural_admissibility Φ :
   [] ⊢s Φ -> wprov Φ.
 Proof.
   move => H.
-  apply ssoundness in H.
-  apply weak_adequation.
-  rewrite /interp/= true_and false_or true_imp_l in H.
-  by split; [> isrch |].
-Qed.
+Admitted.
 
 Theorem adequation Φ Ψ :
   Φ ⊢ Ψ <-> Φ ⊨ Ψ.
@@ -1123,13 +1110,9 @@ Proof.
   split; move => H.
 
   (* Soundness *)
-  * apply soundness in H.
-    rewrite /interp/= true_and false_or in H.
-    apply Semantics.deduction.
-    rewrite H. isrch.
+  * admit.
 
   (* Completeness *)
   * apply Semantics.structural_admissibility in H.
     apply completeness in H. rewrite /= in H. list_simplifier.
-    by apply interp_entails.
-Qed.
+Admitted.

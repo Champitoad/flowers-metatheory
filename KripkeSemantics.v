@@ -9,29 +9,32 @@ Definition theory := propset flower.
 Definition btot (Φ : bouquet) : theory :=
   {[ ϕ | ϕ ∈ Φ ]}.
 
-#[global] Coercion btot : bouquet >-> theory.
+Coercion btot : bouquet >-> theory.
+
+Lemma empty_bouquet_theory :
+  btot [] ≡@{theory} ∅.
+Proof.
+  repeat red. move => ϕ. split; move => H; inv H.
+Qed.
+
+Lemma btot_equiv_empty (Φ : bouquet) :
+  Φ ≡@{theory} ∅ -> Φ = [].
+Proof.
+  move => H. repeat red in H.
+  apply equiv_nil. repeat red. move => ϕ.
+  case (H ϕ) => {H} [H1 H2]. split; move => Hϕ.
+  * specialize (H1 Hϕ). inv H1.
+  * inv Hϕ.
+Qed.
 
 (** * Pre-models are just domains with interpretation functions for terms and
       predicates *)
-
-Definition elem {A C} `{Set_ A C} (X : C) :=
-  { x | x ∈ X }.
 
 Class premodel (D : Type) := {
   domain : propset D;
   interp_fun : name -> list (elem domain) -> elem domain;
   interp_pred : name -> propset (list (elem domain))
 }.
-
-Definition elem_subseteq {A : Type} {X Y : propset A} :
-  X ⊆ Y -> elem X -> elem Y.
-Proof.
-  move => H [x Hx]. exists x. exact (H x Hx).
-Defined.
-
-Definition elem_subseteq_list {A : Type} {X Y : propset A}
-    (H : X ⊆ Y) (l : list (elem X)) : list (elem Y) :=
-  (λ '(x ↾ Hx), x ↾ H x Hx) <$> l.
 
 (* Pre-model inclusion is domain and interpretation inclusion *)
 
@@ -135,6 +138,14 @@ Definition entails (T U : theory) :=
 
 Definition eqentails T U := entails T U /\ entails U T.
 
+#[export] Instance preorder_entails : PreOrder entails.
+Proof.
+  econs; red.
+  * move => T. done.
+  * move => T1 T2 T3. rewrite /entails. move => H1 H2 α e H.
+    apply H2. by apply H1.
+Qed.
+
 #[export] Instance equiv_eqentails : Equivalence eqentails.
 Proof.
   econs; repeat red.
@@ -149,5 +160,18 @@ Qed.
 
 End Forcing.
 
+#[export] Hint Extern 1 (entails _ _) => reflexivity : core.
+#[export] Hint Extern 1 (eqentails _ _) => reflexivity : core.
+
 Infix "⊨" := entails (at level 40).
 Infix "⫤⊨" := eqentails (at level 40).
+
+Add Parametric Morphism {A} (K : KModel A) : entails with signature
+  equiv ==> equiv ==> impl
+  as equiv_entails.
+Proof.
+  rewrite /entails/forces.
+  move => T T' HT U U' HU H α e Hf ϕ Hϕ.
+  apply H. move => ϕ' Hϕ'. apply Hf. by apply HT.
+  by apply HU.
+Qed.
