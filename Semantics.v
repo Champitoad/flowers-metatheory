@@ -694,7 +694,7 @@ Proof.
     apply (S_cut B [] [C]); simpl; auto; by pweak 1.
 Qed.
 
-#[export] Instance : Equiv form := eqderiv.
+(* #[export] Instance : Equiv form := eqderiv. *)
 
 #[global] Hint Extern 1 (_ ⟺ _) => reflexivity : core.
 

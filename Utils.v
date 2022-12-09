@@ -65,6 +65,17 @@ Proof.
   apply (nat_strong_lemma P H0 IH n n). constructor.
 Qed.
 
+(** ** Functions *)
+
+Definition injective {A B} (f : A -> B) :=
+  ∀ x y : A, f x = f y -> x = y.
+
+Definition surjective {A B} (f : A -> B) :=
+  ∀ y : B, ∃ x : A, f x = y.
+
+Definition bijective {A B} (f : A -> B) :=
+  injective f /\ surjective f.
+
 (** * Lists *)
 
 Lemma equiv_nil {A} : ∀ (l : list A),
@@ -94,62 +105,6 @@ Proof.
   elim => [|a l IH] H; constructor.
   apply H. by left.
   apply IH. move => y Hy. apply H. by right.
-Qed.
-
-Ltac solve_elem_of_list :=
-  match goal with
-  | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list
-  | |- ?x ∈ ?x :: ?l => apply elem_of_list_here
-  | H : ?x = ?y |- ?x ∈ ?y :: ?l => rewrite H; apply elem_of_list_here
-  | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
-  | |- ?x ∈ ?l => by auto
-  end.
-
-Lemma elem_of_singl {A} (x : A) :
-  x ∈ [x].
-Proof.
-  econs.
-Qed.
-
-Lemma elem_of_map {A B : Type} (f : A -> B) (l : list A) (y : B) :
-  y ∈ f <$> l <->
-  exists x, x ∈ l /\ y = f x.
-Proof.
-  elim: l => [|a l IHl]; split; move => H.
-  * inv H.
-  * case: H => [? [H _]]. inv H.
-  * inv H. exists a. split; econs.
-    apply IHl in H2. case: H2 => [x [H1 H2]].
-    exists x. split; auto. econs.
-  * case: H => [x [H1 H2]]. subst.
-    inve H1; rewrite fmap_cons.
-    econs. econs. apply IHl.
-    exists x. split; auto.
-Qed.
-
-Lemma subseteq_cons_nil {A} (x : A) (l : list A) :
-  ~ (x :: l) ⊆ [].
-Proof.
-  red. move => H. red in H. red in H.
-  specialize (H x (elem_of_list_here x l)).
-  inv H.
-Qed.
-
-Lemma subseteq_nil {A} (l : list A) :
-  l ⊆ [] -> l = [].
-Proof.
-  case: l => [|x l] H; auto.
-  destruct (subseteq_cons_nil x l H).
-Qed.
-
-Lemma proper_app_subseteq {A} : forall (l1' l1 l2 l2' : list A),
-  l1 ⊆ l1' -> l2 ⊆ l2' ->
-  l1 ++ l2 ⊆ l1' ++ l2'.
-Proof.
-  rewrite /subseteq /list_subseteq.
-  intros.
-  decompose_elem_of_list;
-  solve_elem_of_list.
 Qed.
 
 Lemma In_Forall {A} (P : A -> Prop) : ∀ (l : list A),
@@ -368,6 +323,131 @@ Proof.
 Qed.
 
 (** * Sets *)
+
+Ltac solve_elem_of_list :=
+  match goal with
+  | |- ?x ∈ ?l ++ ?l' => apply elem_of_app; (left + right); solve_elem_of_list
+  | |- ?x ∈ ?x :: ?l => apply elem_of_list_here
+  | H : ?x = ?y |- ?x ∈ ?y :: ?l => rewrite H; apply elem_of_list_here
+  | |- ?x ∈ ?y :: ?l => apply elem_of_list_further; solve_elem_of_list
+  | |- ?x ∈ ?l => by auto
+  end.
+
+Lemma elem_of_singl {A} (x : A) :
+  x ∈ [x].
+Proof.
+  econs.
+Qed.
+
+Lemma elem_of_map {A B : Type} (f : A -> B) (l : list A) (y : B) :
+  y ∈ f <$> l <->
+  exists x, x ∈ l /\ y = f x.
+Proof.
+  elim: l => [|a l IHl]; split; move => H.
+  * inv H.
+  * case: H => [? [H _]]. inv H.
+  * inv H. exists a. split; econs.
+    apply IHl in H2. case: H2 => [x [H1 H2]].
+    exists x. split; auto. econs.
+  * case: H => [x [H1 H2]]. subst.
+    inve H1; rewrite fmap_cons.
+    econs. econs. apply IHl.
+    exists x. split; auto.
+Qed.
+
+Definition propset_subseteq A :=
+  @subseteq (propset A) (@set_subseteq_instance _ _ propset_elem_of).
+
+#[export] Instance subseteq_po {A} : PreOrder (propset_subseteq A).
+Proof.
+  econs; repeat red.
+  move => X Y Z H1 H2 x Hx. apply H2. by apply H1.
+Qed.
+
+Add Parametric Morphism A : (@propset_union A) with signature
+  subseteq ==> subseteq ==> subseteq
+  as proper_union_subseteq.
+Admitted.
+
+Lemma union_empty_r {A} (X : propset A) :
+  X ∪ ∅ ≡ X.
+Admitted.
+
+Lemma union_comm {A} (X Y : propset A) :
+  X ∪ Y ≡ Y ∪ X.
+Proof.
+  split; intro H; case H; by (left + right).
+Qed.
+
+Lemma union_assoc {A} (X Y Z : propset A) :
+  X ∪ (Y ∪ Z) ≡ (X ∪ Y) ∪ Z.
+Proof.
+Admitted.
+
+Lemma union_idempotent {A} (X : propset A) :
+  X ∪ X ≡ X.
+Proof.
+  repeat red. intros x. split; intro H.
+  * case: H; done.
+  * by left.
+Qed.
+
+Lemma subseteq_union_equiv {A} (X Y : propset A) :
+  X ⊆ Y -> X ∪ Y ≡ Y.
+Proof.
+  intros H x; split; intros Hx.
+  * case Hx; done.
+  * by right.
+Qed.
+
+Lemma subseteq_union_intro {A} (X Y Z : propset A) :
+  X ⊆ Y -> X ⊆ Y ∪ Z.
+Proof.
+  intros H x Hx. left. by apply H.
+Qed.
+
+Lemma subseteq_cons_nil {A} (x : A) (l : list A) :
+  ~ (x :: l) ⊆ [].
+Proof.
+  red. move => H. red in H. red in H.
+  specialize (H x (elem_of_list_here x l)).
+  inv H.
+Qed.
+
+Lemma subseteq_nil {A} (l : list A) :
+  l ⊆ [] -> l = [].
+Proof.
+  case: l => [|x l] H; auto.
+  destruct (subseteq_cons_nil x l H).
+Qed.
+
+Lemma nil_subseteq {A} (X : propset A) :
+  {[ x | x ∈ [] ]} ⊆ X.
+Proof.
+  intros x Hx. rewrite elem_of_PropSet in Hx. inv Hx.
+Qed.
+
+Lemma singl_subseteq {A} (x : A) (X : propset A) :
+  {[ y | y ∈ [x] ]} ⊆ X <-> x ∈ X.
+Proof.
+  split; intro H.
+  * apply (H x). apply elem_of_PropSet. apply elem_of_singl.
+  * intros y Hy. rewrite elem_of_PropSet in Hy. inv Hy. inv H2.
+Qed.
+
+Lemma nsubseteq_exists {A} {X Y : propset A} :
+  X ⊈ Y -> ∃ x, x ∈ X /\ x ∉ Y.
+Admitted.
+
+Lemma proper_app_subseteq {A} : forall (l1' l1 l2 l2' : list A),
+  l1 ⊆ l1' -> l2 ⊆ l2' ->
+  l1 ++ l2 ⊆ l1' ++ l2'.
+Proof.
+  rewrite /subseteq /list_subseteq.
+  intros.
+  decompose_elem_of_list;
+  solve_elem_of_list.
+Qed.
 
 Definition elem {A C} `{Set_ A C} (X : C) :=
   { x | x ∈ X }.

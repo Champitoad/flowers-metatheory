@@ -1384,3 +1384,9 @@ Proof.
     etransitivity; [> |eapply H].
     by apply subcopolepis.
 Qed.
+
+(** * Weakening *)
+
+Theorem weakening Φ Φ' Ψ :
+  Φ ⊆ Φ' -> Φ ⊢ Ψ -> Φ' ⊢ Ψ.
+Admitted.
