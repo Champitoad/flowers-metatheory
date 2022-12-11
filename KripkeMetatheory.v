@@ -116,24 +116,30 @@ Add Parametric Morphism {ϕ} : (consistent ϕ) with signature
   as proper_consistent_equiv.
 Proof.
   intros T U Hequiv. rewrite /consistent/tnderiv.
-  split; intros H Φ HΦ HH.
-  * rewrite -Hequiv in HΦ. apply (H Φ); auto.
-  * rewrite Hequiv in HΦ. apply (H Φ); auto.
+  split; intros H Φ HΦ HH; set_solver.
 Qed.
 
 Add Parametric Morphism {ϕ} : (consistent ϕ) with signature
   subseteq --> impl
   as proper_consistent_subseteq.
-Admitted.
+Proof.
+  intros T U Hincl. rewrite /consistent/tnderiv. intros H Φ HΦ.
+  set_solver.
+Qed.
 
 Add Parametric Morphism : tderiv with signature
   equiv ==> eq ==> iff
   as proper_tderiv_equiv.
-Admitted.
+Proof.
+  intros T U Hequiv ϕ. rewrite /tderiv. split; intros [Ψ [Hincl H]];
+  by (exists Ψ; set_solver).
+Qed.
 
 Lemma tderiv_weakening {T T' : theory} {ϕ : flower} :
   T ⊆ T' -> T !⊢ ϕ -> T' !⊢ ϕ.
-Admitted.
+Proof.
+  intros Hincl. rewrite /tderiv. set_solver.
+Qed.
 
 Lemma deriv_tderiv Φ (ϕ : flower) :
   Φ ⊢ ϕ -> Φ !⊢ ϕ.
@@ -167,26 +173,41 @@ Proof.
   intros n ψ H. by exists n.
 Qed.
 
-Lemma subset_completion {U} :
-  U ⊆ completion -> ∃ n, U ⊆ ncompletion n.
+Axiom subset_completion : ∀ (Φ : bouquet),
+  btot Φ ⊆ completion -> ∃ n, btot Φ ⊆ ncompletion n.
+
+(* Lemma subset_completion {Φ : bouquet} :
+  btot Φ ⊆ completion -> ∃ n, btot Φ ⊆ ncompletion n.
 Proof.
   intros H. do 2 red in H.
   rewrite /completion in H. setoid_rewrite elem_of_PropSet in H.
-Admitted.
+  assert (ns : list nat).
+  { induction Φ as [|ψ Ψ]. exact [].
+    refine (_ :: _).
+    * assert (Hψ : ψ ∈ ψ :: Ψ) by left.
+      specialize (H ψ Hψ).
+      (* case: H => n Hn. *)
+      admit.
+    * apply IHΨ. intros. apply H. by right. }
+Admitted. *)
 
 Lemma enum_consistent_singl {n} :
   consistent ϕ (ncompletion n ∪ enum_flower n) ->
   {[ ψ | ψ = enum_flower n ∧ consistent ϕ (ncompletion n ∪ ψ) ]}
   ≡@{theory}
   enum_flower n.
-Admitted.
+Proof.
+  set_solver.
+Qed.
 
 Lemma enum_nconsistent_empty {n} :
   ~ consistent ϕ (ncompletion n ∪ enum_flower n) ->
   {[ ψ | ψ = enum_flower n ∧ consistent ϕ (ncompletion n ∪ ψ) ]}
   ≡@{theory}
   ∅.
-Admitted.
+Proof.
+  set_solver.
+Qed.
 
 Lemma ncompletion_consistent : ∀ n,
   consistent ϕ (ncompletion n).
@@ -207,8 +228,8 @@ Lemma completion_consistent :
   consistent ϕ completion.
 Proof.
   red. rewrite -tderiv_tnderiv. rewrite /completion. intros [Ψ [HΨ H]].
-  case (subset_completion HΨ) => {HΨ} [n HΨ].
-  pose proof (Hc := proper_consistent_subseteq  _ _ _ HΨ (ncompletion_consistent n)).
+  case (subset_completion Ψ HΨ) => {HΨ} [n HΨ].
+  pose proof (Hc := proper_consistent_subseteq _ _ _ HΨ (ncompletion_consistent n)).
   rewrite /consistent -tderiv_tnderiv in Hc.
   by apply deriv_tderiv in H.
 Qed.
@@ -287,10 +308,23 @@ Instance KCanon : KModel term :=
 
 End Canonical.
 
+(** ** Properties of consistent and complete theories *)
+
+Section Properties.
+
+Context (T : theory) (ϕ : flower).
+Context (Hcon : consistent ϕ T) (Hcom : complete ϕ T).
+
+(* Lemma inversion_elem_of n Φ Δ :
+  (n ⋅ Φ ⫐ Δ) ∈ T -> ∀ σ :  *)
+
+End Properties.
+
 (** ** Completeness *)
 
 Lemma completeness_contra T ϕ :
   T !⊬ ϕ -> ∃ A (K : KModel A), ~ (T ⊨ ϕ).
+Proof.
 Admitted.
 
 Lemma not_prov_tnderiv (ϕ : flower) :

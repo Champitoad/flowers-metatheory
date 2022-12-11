@@ -130,16 +130,16 @@ Fixpoint unshift (n : nat) (c : nat) (ϕ : flower) : flower :=
 Definition gunshift n c '(m ⋅ Φ) : garden :=
   m ⋅ unshift n (c + m) <$> Φ.
 
-Fixpoint subst (n : nat) (t : term) (ϕ : flower) : flower :=
+Fixpoint subst (σ : nat -> term) (ϕ : flower) : flower :=
   match ϕ with
-  | Atom p args => Atom p (tsubst n t <$> args)
+  | Atom p args => Atom p (tsubst σ <$> args)
   | m ⋅ Φ ⫐ Δ =>
-      m ⋅ subst (n + m) (tshift m 0 t) <$> Φ ⫐
-        ((λ '(k ⋅ Ψ), k ⋅ subst (n + m + k) (tshift (m + k) 0 t) <$> Ψ) : garden -> garden) <$> Δ
+      m ⋅ subst (sshift m σ) <$> Φ ⫐
+        ((λ '(k ⋅ Ψ), k ⋅ subst (sshift (m + k) σ) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
-Definition gsubst n t '(m ⋅ Φ) : garden :=
-  m ⋅ subst (n + m) (tshift m 0 t) <$> Φ.
+Definition gsubst σ '(m ⋅ Φ) : garden :=
+  m ⋅ subst (sshift m σ) <$> Φ.
 
 Lemma shift_zero : ∀ ϕ c,
   shift 0 c ϕ = ϕ.
@@ -703,12 +703,12 @@ Inductive step : bouquet -> bouquet -> Prop :=
 | R_ipis i t n Φ Δ :
   0 <= i <= n ->
   S n ⋅ Φ ⫐ Δ ⇀
-  [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ) ⫐ gunshift 1 i <$> (gsubst i (tshift (S n) 0 t) <$> Δ); S n ⋅ Φ ⫐ Δ]
+  [n ⋅ unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ) ⫐ gunshift 1 i <$> (gsubst (i ↦ tshift (S n) 0 t) <$> Δ); S n ⋅ Φ ⫐ Δ]
 
 | R_ipet i t n Φ γ Δ Δ' :
   0 <= i <= n ->
   γ ⫐ Δ ++ [S n ⋅ Φ] ++ Δ' ⇀
-  γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst i (tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'
+  γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'
 
 where "Φ ⇀ Ψ" := (step Φ Ψ).
 
@@ -1387,6 +1387,6 @@ Qed.
 
 (** * Weakening *)
 
-Theorem weakening Φ Φ' Ψ :
+(* Theorem weakening Φ Φ' Ψ :
   Φ ⊆ Φ' -> Φ ⊢ Ψ -> Φ' ⊢ Ψ.
-Admitted.
+Admitted. *)

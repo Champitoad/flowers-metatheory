@@ -1,7 +1,7 @@
 Require Import stdpp.list stdpp.relations.
 Require Import ssreflect.
 
-Require Import Flowers.Syntax Flowers.Semantics Flowers.Utils.
+Require Import Flowers.Terms Flowers.Syntax Flowers.Semantics Flowers.Utils.
 
 (** * Soundness *)
 
@@ -99,21 +99,20 @@ Proof.
   rewrite IH /interp funshift_unshift //.
 Qed.
 
-Lemma fsubst_subst : ∀ (ϕ : flower) n t,
-  fsubst n t ⌊ϕ⌋ = ⌊subst n t ϕ⌋.
+Lemma fsubst_subst : ∀ (ϕ : flower) σ,
+  fsubst σ ⌊ϕ⌋ = ⌊subst σ ϕ⌋.
 Proof.
-  elim/flower_induction => [p args |γ Δ IHγ IHΔ] n t //=.
+  elim/flower_induction => [p args |γ Δ IHγ IHΔ] σ //=.
   move: Δ IHγ IHΔ; case γ => [m Φ]; move => Δ IHγ IHΔ.
   rewrite /interp/=.
   rewrite fsubst_nforall/= fsubst_And fsubst_Or.
-  rewrite Forall_forall in IHγ; specialize (IHγ (n + m)).
-  rewrite Forall_forall in IHγ; specialize (IHγ (Terms.tshift m 0 t)).
+  rewrite Forall_forall in IHγ; specialize (IHγ (sshift m σ)).
   rewrite Forall_equiv_map in IHγ.
   rewrite IHγ.
   rewrite -list_fmap_compose list_fmap_compose.
-  set f := λ δ : garden, fsubst (n + m) (Terms.tshift m 0 t) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋).
+  set f := λ δ : garden, fsubst (sshift m σ) (let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋).
   set g := λ δ : garden, let 'm0 ⋅ Ψ := δ in m0#∃ ⋀ ⌊[Ψ]⌋.
-  set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (subst (n + m + k) (Terms.tshift (m + k) 0 t)) <$> Ψ.
+  set h := λ δ : garden, let 'k ⋅ Ψ := δ in k ⋅ (subst (sshift (m + k) σ)) <$> Ψ.
   assert (H : Forall2 eq (f <$> Δ) (g ∘ h <$> Δ)).
   { elim: {Δ} IHΔ => [|[k Ψ] Δ IHΨ _ IH]//=; econs.
     rewrite /f/g/h//=.
@@ -121,17 +120,16 @@ Proof.
     do 2 f_equal.
     rewrite list_fmap_compose -list_fmap_compose -list_fmap_compose.
     apply Forall_eq_map. rewrite /=.
-    rewrite Forall_forall in IHΨ; specialize (IHΨ (n + m + k)).
-    rewrite Forall_forall in IHΨ; specialize (IHΨ (Terms.tshift (m + k) 0 t)).
-    rewrite -Terms.tshift_add [k + m]Nat.add_comm.
+    rewrite Forall_forall in IHΨ; specialize (IHΨ (sshift (m + k) σ)).
+    rewrite -sshift_add [k + m]Nat.add_comm.
     done. }
   by rewrite H list_fmap_compose.
 Qed.
 
-Lemma fsubst_bsubst (Ψ : bouquet) : ∀ n c,
-  fsubst n c ⟦Ψ⟧ = ⟦subst n c <$> Ψ⟧.
+Lemma fsubst_bsubst (Ψ : bouquet) σ :
+  fsubst σ ⟦Ψ⟧ = ⟦subst σ <$> Ψ⟧.
 Proof.
-  elim: Ψ => [|ϕ Φ IH] n c //=.
+  elim: Ψ => [|ϕ Φ IH] //=.
   rewrite IH /interp fsubst_subst //.
 Qed.
 
@@ -359,8 +357,8 @@ Qed.
 Lemma ipis i t n Φ Δ :
   0 <= i <= n ->
   ⟦S n ⋅ Φ ⫐ Δ⟧ ⟺
-  ⟦[(n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ) ⫐
-    gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)); S n ⋅ Φ ⫐ Δ]⟧.
+  ⟦[(n ⋅ unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ) ⫐
+    gunshift 1 i <$> (gsubst (i ↦ tshift (S n) 0 t) <$> Δ)); S n ⋅ Φ ⫐ Δ]⟧.
 Proof.
   intros Hi.
   rewrite /interp/= true_and.
@@ -369,10 +367,10 @@ Proof.
     assert (H : 1 + n = S n); first lia; rewrite H; clear H.
     set A := ⋀ ⌊[Φ]⌋ ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$> Δ).
     assert (H :
-      funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) A) ⟺
-      ⋀ ⌊[unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)]⌋
+      funshift 1 i (fsubst (i ↦ tshift (S n) 0 t) A) ⟺
+      ⋀ ⌊[unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ)]⌋
        ⊃ ⋁ ((λ '(m ⋅ Ψ), m#∃ ⋀ ⌊[Ψ]⌋) <$>
-            (gunshift 1 i <$> (gsubst i (Terms.tshift (S n) 0 t) <$> Δ)))).
+            (gunshift 1 i <$> (gsubst (i ↦ tshift (S n) 0 t) <$> Δ)))).
     { rewrite /A/=.
       rewrite fsubst_And funshift_And.
       rewrite fsubst_Or funshift_Or.
@@ -393,7 +391,7 @@ Proof.
     rewrite -H.
     by apply nforall_elim.
   * pweak 0. rewrite /=.
-    pfaL 0 (Terms.TVar 0).
+    pfaL 0 (TVar 0).
     rewrite fsubst_fshift funshift_fshift.
     passum.
 Qed.
@@ -401,7 +399,7 @@ Qed.
 Lemma ipet i t n Φ γ Δ Δ' :
   0 <= i <= n ->
   ⟦γ ⫐ Δ ++ [S n ⋅ Φ] ++ Δ'⟧ ⟺
-  ⟦γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'⟧.
+  ⟦γ ⫐ Δ ++ [n ⋅ unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ); S n ⋅ Φ] ++ Δ'⟧.
 Proof.
   intros Hi.
   rewrite /interp/= true_and true_and. case: γ => [m Ψ].
@@ -414,8 +412,8 @@ Proof.
   split. pright. isrch. rewrite false_or.
   rewrite nexists_one nexists_add -[1 + n]/(S n).
   assert (H :
-    funshift 1 i (fsubst i (Terms.tshift (S n) 0 t) ⋀ ⌊[Φ]⌋) ⟺
-    ⋀ ⌊[unshift 1 i <$> (subst i (Terms.tshift (S n) 0 t) <$> Φ)]⌋).
+    funshift 1 i (fsubst (i ↦ tshift (S n) 0 t) ⋀ ⌊[Φ]⌋) ⟺
+    ⋀ ⌊[unshift 1 i <$> (subst (i ↦ tshift (S n) 0 t) <$> Φ)]⌋).
   { rewrite fsubst_And funshift_And.
     apply proper_And.
     do 2 rewrite -list_fmap_compose.
@@ -541,23 +539,23 @@ Proof.
   by rewrite unshift_funshift IH.
 Qed.
 
-Lemma subst_fsubst : forall C i t,
-  subst i t <$> ⌈C⌉ = ⌈fsubst i t C⌉.
+Lemma subst_fsubst : forall C σ,
+  subst σ <$> ⌈C⌉ = ⌈fsubst σ C⌉.
 Proof.
   elim/form_induction =>
-    [|||A B IHA IHB |A B IHA IHB |A B IHA IHB |A IHA |A IHA] n c //=;
+    [|||A B IHA IHB |A B IHA IHB |A B IHA IHB |A IHA |A IHA] σ //=;
   try repeat rewrite Nat.add_0_r;
-  try repeat rewrite Terms.tshift_zero;
+  try repeat rewrite sshift_zero;
   try rewrite fmap_app;
   try by rewrite IHA IHB //=.
   by rewrite IHA.
   by rewrite IHA.
 Qed.
 
-Lemma bsubst_fsubst : forall Γ i t,
-  subst i t <$> ⌈[Γ]⌉ = ⌈[fsubst i t <$> Γ]⌉.
+Lemma bsubst_fsubst : forall Γ σ,
+  subst σ <$> ⌈[Γ]⌉ = ⌈[fsubst σ <$> Γ]⌉.
 Proof.
-  elim => [|A Γ IH] n c //.
+  elim => [|A Γ IH] σ //.
   rewrite /cinterp bind_cons fmap_cons fmap_app bind_cons.
   by rewrite subst_fsubst IH.
 Qed.
@@ -907,12 +905,12 @@ Proof.
       erewrite Hctx. eapply R_ctx.
       epose proof (Hipis := R_ipis 0 t 0 _ _).
       eapply Hipis. lia. }
-    rewrite -fill_comp/= Terms.tshift_zero subst_fsubst unshift_funshift.
+    rewrite -fill_comp/= sshift_zero subst_fsubst unshift_funshift.
 
     etransitivity. eapply cstep_congr.
     repispis 0 0 (@nil flower) [1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]]. reflexivity.
 
-    set iA := funshift 1 0 (fsubst 0 (Terms.tshift 1 0 t) A) in IH1 |- *.
+    set iA := funshift 1 0 (fsubst (0 ↦ tshift 1 0 t) A) in IH1 |- *.
     set X0 := Petal (0 ⋅ ⌈iA⌉ ++ [1 ⋅ [] ⫐ [0 ⋅ ⌈A⌉]]) [] 0 □ [].
     rewrite -fill_comp.
     applyIH IH1 (Y ⪡ Z) X0.

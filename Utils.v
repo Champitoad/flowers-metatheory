@@ -343,16 +343,7 @@ Lemma elem_of_map {A B : Type} (f : A -> B) (l : list A) (y : B) :
   y ∈ f <$> l <->
   exists x, x ∈ l /\ y = f x.
 Proof.
-  elim: l => [|a l IHl]; split; move => H.
-  * inv H.
-  * case: H => [? [H _]]. inv H.
-  * inv H. exists a. split; econs.
-    apply IHl in H2. case: H2 => [x [H1 H2]].
-    exists x. split; auto. econs.
-  * case: H => [x [H1 H2]]. subst.
-    inve H1; rewrite fmap_cons.
-    econs. econs. apply IHl.
-    exists x. split; auto.
+  set_solver.
 Qed.
 
 Definition propset_subseteq A :=
@@ -367,77 +358,74 @@ Qed.
 Add Parametric Morphism A : (@propset_union A) with signature
   subseteq ==> subseteq ==> subseteq
   as proper_union_subseteq.
-Admitted.
+Proof.
+  set_solver.
+Qed.
 
 Lemma union_empty_r {A} (X : propset A) :
   X ∪ ∅ ≡ X.
-Admitted.
+Proof.
+  set_solver.
+Qed.
 
 Lemma union_comm {A} (X Y : propset A) :
   X ∪ Y ≡ Y ∪ X.
 Proof.
-  split; intro H; case H; by (left + right).
+  set_solver.
 Qed.
 
 Lemma union_assoc {A} (X Y Z : propset A) :
   X ∪ (Y ∪ Z) ≡ (X ∪ Y) ∪ Z.
 Proof.
-Admitted.
+  set_solver.
+Qed.
 
 Lemma union_idempotent {A} (X : propset A) :
   X ∪ X ≡ X.
 Proof.
-  repeat red. intros x. split; intro H.
-  * case: H; done.
-  * by left.
+  set_solver.
 Qed.
 
 Lemma subseteq_union_equiv {A} (X Y : propset A) :
   X ⊆ Y -> X ∪ Y ≡ Y.
 Proof.
-  intros H x; split; intros Hx.
-  * case Hx; done.
-  * by right.
+  set_solver.
 Qed.
 
 Lemma subseteq_union_intro {A} (X Y Z : propset A) :
   X ⊆ Y -> X ⊆ Y ∪ Z.
 Proof.
-  intros H x Hx. left. by apply H.
+  set_solver.
 Qed.
 
 Lemma subseteq_cons_nil {A} (x : A) (l : list A) :
   ~ (x :: l) ⊆ [].
 Proof.
-  red. move => H. red in H. red in H.
-  specialize (H x (elem_of_list_here x l)).
-  inv H.
+  set_solver.
 Qed.
 
 Lemma subseteq_nil {A} (l : list A) :
   l ⊆ [] -> l = [].
 Proof.
-  case: l => [|x l] H; auto.
-  destruct (subseteq_cons_nil x l H).
+  destruct l; set_solver.
 Qed.
 
 Lemma nil_subseteq {A} (X : propset A) :
   {[ x | x ∈ [] ]} ⊆ X.
 Proof.
-  intros x Hx. rewrite elem_of_PropSet in Hx. inv Hx.
+  set_solver.
 Qed.
 
 Lemma singl_subseteq {A} (x : A) (X : propset A) :
   {[ y | y ∈ [x] ]} ⊆ X <-> x ∈ X.
 Proof.
-  split; intro H.
-  * apply (H x). apply elem_of_PropSet. apply elem_of_singl.
-  * intros y Hy. rewrite elem_of_PropSet in Hy. inv Hy. inv H2.
+  set_solver.
 Qed.
 
-Lemma nsubseteq_exists {A} {X Y : propset A} :
+(* Lemma nsubseteq_exists {A} {X Y : propset A} :
   X ⊈ Y -> ∃ x, x ∈ X /\ x ∉ Y.
-Admitted.
+Proof.
+Admitted. *)
 
 Lemma proper_app_subseteq {A} : forall (l1' l1 l2 l2' : list A),
   l1 ⊆ l1' -> l2 ⊆ l2' ->
@@ -474,4 +462,12 @@ Lemma proj1_elem_subseteq_list {A} {X Y : propset A} (H : X ⊆ Y) (l : list (el
 Proof.
   rewrite /elem_subseteq_list -list_fmap_compose.
   apply eq_fmap. by case.
+Qed.
+
+(** * Arithmetic *)
+
+Lemma nltb_zero : ∀ n,
+  n <? 0 = false.
+Proof.
+  intros. apply Nat.ltb_nlt. lia.
 Qed.
