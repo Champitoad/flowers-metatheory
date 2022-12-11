@@ -71,7 +71,7 @@ Proof.
   * apply grounding. by apply local_soundness.
   * apply pgrounding.
     red. intros * _.
-    red. intros ? H. inv H.
+    red. intros e ? H. inv H.
 Qed.
 
 Theorem soundness (Φ : bouquet) :
@@ -146,6 +146,30 @@ Lemma deriv_tderiv Φ (ϕ : flower) :
 Proof.
   by exists Φ.
 Qed.
+
+(** ** Properties of consistent and complete theories *)
+
+Section Properties.
+
+Definition has_dom (n : nat) (σ : nat -> term) :=
+  ∀ m, m >= n -> σ m = TVar m.
+
+Context (T : theory) (ϕ : flower).
+Context (Hcon : consistent ϕ T) (Hcom : complete ϕ T).
+
+Lemma inversion_elem_of n Φ Δ :
+  (n ⋅ Φ ⫐ Δ) ∈ T -> ∀ σ, has_dom n σ ->
+  (∃ m Ψ τ, (m ⋅ Ψ) ∈ Δ /\ has_dom m τ /\ btot (subst τ <$> (subst σ <$> Ψ)) ⊆ T) \/
+  ∃ ψ, ψ ∈ Φ /\ T !⊬ subst σ ψ.
+Admitted.
+
+Lemma inversion_tnderiv n Φ Δ :
+  T !⊬ (n ⋅ Φ ⫐ Δ) -> ∃ σ, has_dom n σ /\
+  ∀ m Ψ τ, (m ⋅ Ψ) ∈ Δ -> has_dom m τ ->
+  ∀ ψ, ψ ∈ Ψ -> T ∪ btot (subst σ <$> Φ) !⊬ subst τ (subst σ ψ).
+Admitted.
+
+End Properties.
 
 (** ** Completion of a theory *)
 
@@ -306,26 +330,45 @@ Instance KCanon : KModel term :=
      KripkeSemantics.model := model;
      KripkeSemantics.model_mono := model_mono |}.
 
+Lemma adequacy_forcing (w : world) :
+  let '(exist _ T (conj Hcon Hcom)) := w in
+  ∀ ψ, (ψ ∈ T -> ∀ e, w : e ⊩ ψ) /\ (T !⊬ ψ -> ∃ e, ~ w : e ⊩ ψ).
+Admitted.
+
 End Canonical.
-
-(** ** Properties of consistent and complete theories *)
-
-Section Properties.
-
-Context (T : theory) (ϕ : flower).
-Context (Hcon : consistent ϕ T) (Hcom : complete ϕ T).
-
-(* Lemma inversion_elem_of n Φ Δ :
-  (n ⋅ Φ ⫐ Δ) ∈ T -> ∀ σ :  *)
-
-End Properties.
 
 (** ** Completeness *)
 
-Lemma completeness_contra T ϕ :
+Section Completeness.
+
+Context (T : theory) (ϕ : flower) (Hcon : consistent ϕ T).
+
+Let K := KCanon ϕ.
+
+Let C : K.(world).
+Proof.
+  exists (completion T ϕ). split.
+  by apply completion_consistent.
+  by apply completion_complete.
+Defined.
+
+Lemma completeness_contra :
   T !⊬ ϕ -> ∃ A (K : KModel A), ~ (T ⊨ ϕ).
 Proof.
-Admitted.
+  intros H. exists term. exists K.
+  rewrite /entails. apply demorgan_forall.
+  exists C. apply demorgan_impl.
+  split.
+  * intros e. red. intros ψ Hψ.
+    case (adequacy_forcing ϕ C ψ) => HC1 HC2.
+    apply HC1; [> |set_solver].
+    by apply (subseteq_ncompletion_completion _ _ 0).
+  * apply demorgan_forall.
+    case (adequacy_forcing ϕ C ϕ) => HC1 HC2.
+    apply HC2. by apply completion_consistent.
+Qed.
+
+End Completeness.
 
 Lemma not_prov_tnderiv (ϕ : flower) :
   ~ prov ϕ -> ∅ !⊬ ϕ.
@@ -340,7 +383,7 @@ Theorem completeness (ϕ : flower) :
 Proof.
   apply contra_recip. move => H H'. apply not_prov_tnderiv in H.
   apply completeness_contra in H. move: H => [A' [K' H]].
-  apply H. apply H'.
+  apply H. apply H'. done.
 Qed.
 
 End Completeness.

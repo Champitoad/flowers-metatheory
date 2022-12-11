@@ -131,10 +131,8 @@ Fixpoint fforces (w : world) (e : eval (model w)) (ϕ : flower) {struct ϕ} : Pr
 Definition forces α e (T : theory) :=
   ∀ ϕ, ϕ ∈ T -> fforces α e ϕ.
 
-Notation "α : e ⊩ T" := (forces α e T) (at level 20, e at level 0).
-
 Definition entails (T U : theory) :=
-  ∀ α e, α : e ⊩ T -> α : e ⊩ U.
+  ∀ α, (∀ e, forces α e T) -> (∀ e, forces α e U).
 
 Definition eqentails T U := entails T U /\ entails U T.
 
@@ -160,6 +158,8 @@ Qed.
 
 End Forcing.
 
+Notation "α : e ⊩ T" := (forces α e T) (at level 20, e at level 0).
+
 #[export] Hint Extern 1 (entails _ _) => reflexivity : core.
 #[export] Hint Extern 1 (eqentails _ _) => reflexivity : core.
 
@@ -171,7 +171,7 @@ Add Parametric Morphism {A} (K : KModel A) : entails with signature
   as equiv_entails.
 Proof.
   rewrite /entails/forces.
-  move => T T' HT U U' HU H α e Hf ϕ Hϕ.
-  apply H. move => ϕ' Hϕ'. apply Hf. by apply HT.
+  move => T T' HT U U' HU H α Hf e ϕ Hϕ.
+  apply H. move => e' ϕ' Hϕ'. apply Hf. by apply HT.
   by apply HU.
 Qed.
