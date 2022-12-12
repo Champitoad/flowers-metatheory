@@ -267,6 +267,25 @@ Lemma list_bind_singl {A} (l : list A) :
   l ≫= (λ x, [x]) = l.
 Admitted.
 
+Lemma Forall_impl {A} {P Q : A -> Prop} : ∀ (l : list A),
+  Forall P l ->
+  (Forall (fun x => P x -> Q x) l) ->
+  Forall Q l.
+Proof.
+  elim => [|x l IH] H1 H2 //=.
+  inv H1. inv H2.
+  constructor; done.
+Qed.
+
+Lemma Forall_equiv {A} {P Q : A -> Prop} : ∀ (l : list A),
+  (Forall (fun x => P x <-> Q x) l) ->
+  Forall P l <-> Forall Q l.
+Proof.
+  elim => [|x l IH] H1 //=; split; intros H2;
+  inv H1; inv H2;
+  constructor; intuition; apply IH; done.
+Qed.
+
 Lemma Forall_eq_map {A B} (l : list A) (f g : A -> B) :
   (Forall (fun x => f x = g x) l) <->
   f <$> l = g <$> l.

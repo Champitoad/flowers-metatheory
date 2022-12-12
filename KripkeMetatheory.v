@@ -1,3 +1,5 @@
+Require Import String.
+Open Scope string_scope.
 Require Import ssreflect stdpp.propset stdpp.relations.
 Require Import Classical ClassicalFacts ProofIrrelevance.
 
@@ -71,7 +73,7 @@ Proof.
   * apply grounding. by apply local_soundness.
   * apply pgrounding.
     red. intros * _.
-    red. intros e ? H. inv H.
+    red. intros e ?? H. inv H.
 Qed.
 
 Theorem soundness (Φ : bouquet) :
@@ -104,6 +106,14 @@ Definition consistent (ϕ : flower) (T : theory) :=
 
 Definition complete (ϕ : flower) (T : theory) :=
   ∀ (ψ : flower), T ∪ ψ !⊢ ϕ \/ ψ ∈ T.
+
+Lemma not_prov_tnderiv (ϕ : flower) :
+  ~ prov ϕ -> ∅ !⊬ ϕ.
+Proof.
+  move => H Φ HΦ Hderiv. apply H.
+  apply equiv_empty in HΦ. apply btot_equiv_empty in HΦ.
+  rewrite HΦ in Hderiv. by apply prov_deriv.
+Qed.
 
 Lemma tderiv_tnderiv {T} {ϕ} :
   ~ (T !⊢ ϕ) <-> T !⊬ ϕ.
@@ -147,9 +157,9 @@ Proof.
   by exists Φ.
 Qed.
 
-(** ** Properties of consistent and complete theories *)
+(** ** Inversion principles for consistent and complete theories *)
 
-Section Properties.
+Section Inversion.
 
 Definition has_dom (n : nat) (σ : nat -> term) :=
   ∀ m, m >= n -> σ m = TVar m.
@@ -157,19 +167,26 @@ Definition has_dom (n : nat) (σ : nat -> term) :=
 Context (T : theory) (ϕ : flower).
 Context (Hcon : consistent ϕ T) (Hcom : complete ϕ T).
 
-Lemma inversion_elem_of n Φ Δ :
+Lemma inversion_flower_elem_of n Φ Δ :
   (n ⋅ Φ ⫐ Δ) ∈ T -> ∀ σ, has_dom n σ ->
   (∃ m Ψ τ, (m ⋅ Ψ) ∈ Δ /\ has_dom m τ /\ btot (subst τ <$> (subst σ <$> Ψ)) ⊆ T) \/
   ∃ ψ, ψ ∈ Φ /\ T !⊬ subst σ ψ.
 Admitted.
 
-Lemma inversion_tnderiv n Φ Δ :
+Lemma inversion_tnderiv_atom p args :
+  T !⊬ (Atom p args) -> Atom p args ∉ T.
+Proof.
+  intros H HT. red in H. specialize (H (ftob (Atom p args))).
+  apply H. set_solver. reflexivity.
+Qed.
+
+Lemma inversion_tnderiv_flower n Φ Δ :
   T !⊬ (n ⋅ Φ ⫐ Δ) -> ∃ σ, has_dom n σ /\
   ∀ m Ψ τ, (m ⋅ Ψ) ∈ Δ -> has_dom m τ ->
   ∀ ψ, ψ ∈ Ψ -> T ∪ btot (subst σ <$> Φ) !⊬ subst τ (subst σ ψ).
 Admitted.
 
-End Properties.
+End Inversion.
 
 (** ** Completion of a theory *)
 
@@ -330,20 +347,94 @@ Instance KCanon : KModel term :=
      KripkeSemantics.model := model;
      KripkeSemantics.model_mono := model_mono |}.
 
-Lemma adequacy_forcing (w : world) :
-  let '(exist _ T (conj Hcon Hcom)) := w in
-  ∀ ψ, (ψ ∈ T -> ∀ e, w : e ⊩ ψ) /\ (T !⊬ ψ -> ∃ e, ~ w : e ⊩ ψ).
-Admitted.
-
 End Canonical.
 
 (** ** Completeness *)
 
-Section Completeness.
+Section KCompleteness.
 
-Context (T : theory) (ϕ : flower) (Hcon : consistent ϕ T).
+Context (T : theory) (ϕ : flower) (Hϕ : closed 0 ϕ) (Hcon : consistent ϕ T).
 
 Let K := KCanon ϕ.
+
+Lemma tapply_eval_TFun (w : K.(world)) e f args :
+  tapply_eval (model w) e (TFun f args) =
+  interp_fun f (tapply_eval (model w) e <$> args).
+Proof.
+  done.
+Qed.
+
+Lemma proj1_interp_fun (w : K.(world)) f args :
+  proj1_sig ((K.(model) w).(interp_fun) f args) =
+  TFun f (proj1_sig <$> args).
+Proof.
+  by destruct w as [U [HUcon HUcom]].
+Qed.
+
+Lemma proj1_tapply_eval (w : K.(world)) e : ∀ t,
+  tclosed 0 t ->
+  proj1_sig (tapply_eval (model w) e t) = t.
+Proof.
+  elim/term_induction => [n /= |f args IH] H; inv H.
+  * lia.
+  * apply (Forall_impl args H1) in IH. apply Forall_eq_map in IH.
+    rewrite map_id_ext in IH.
+    rewrite -{2}IH tapply_eval_TFun proj1_interp_fun -list_fmap_compose.
+    done.
+Qed.
+
+Lemma proj1_tapply_eval_fmap (w : K.(world)) e : ∀ (ts : list term),
+  Forall (tclosed 0) ts ->
+  proj1_sig <$> (tapply_eval (model w) e <$> ts) = ts.
+Proof.
+  intros ts H. rewrite -list_fmap_compose -{2}[ts]list_fmap_id.
+  apply Forall_eq_map. induction H; auto. econs.
+  rewrite /compose proj1_tapply_eval; done.
+Qed.
+
+Definition dummy_eval (w : K.(world)) : eval (model w).
+Proof.
+  destruct w. intros n. by exists (TFun "dummy" []).
+Defined.
+
+Lemma atom_elem_of_forces (w : K.(world)) p args :
+  let '(exist _ U (conj Hcon Hcom)) := w in
+  Forall (tclosed 0) args ->
+  Atom p args ∈ U <-> (∀ e, w ∷ e ⊩ Atom p args).
+Proof.
+  destruct w as [U [HUcon HUcom]] eqn:Hw.
+  set W : K.(world) := U ↾ conj HUcon HUcom.
+  intros Hclosed; split; intros H.
+  * intros e. red. intros ψ _ Hψ.
+    assert (Heq : ψ = Atom p args) by set_solver; rewrite Heq; clear Heq Hψ.
+    red. rewrite [interp_pred _]/=. apply elem_of_PropSet.
+    rewrite (proj1_tapply_eval_fmap W); done.
+  * specialize (H (dummy_eval W)). cbn in H.
+    rewrite /forces/= in H.
+    specialize (H (Atom p args)).
+    rewrite /fforces [interp_pred _]/= in H.
+    apply elem_of_PropSet in H.
+    - rewrite (proj1_tapply_eval_fmap W) in H; done.
+    - by constructor.
+    - set_solver.
+Qed.
+
+Lemma adequacy_forcing (w : K.(world)) :
+  let '(exist _ U (conj Hcon Hcom)) := w in
+  ∀ (ψ : flower), closed 0 ψ ->
+  (ψ ∈ U -> ∀ e, w ∷ e ⊩ ψ) /\ (U !⊬ ψ -> ∃ e, ~ w ∷ e ⊩ ψ).
+Proof.
+  destruct w as [U [HUcon HUcom]] eqn:Hw.
+  set W : K.(world) := U ↾ conj HUcon HUcom.
+  elim/flower_induction => [p args |[n Φ] Δ IHΦ IHΔ] Hclosed;
+  inv Hclosed; split; intros H.
+  * apply (atom_elem_of_forces W); done.
+  * assert (HU : Atom p args ∉ U) by (apply (inversion_tnderiv_atom _ ϕ); auto).
+    rewrite (atom_elem_of_forces W) in HU; auto.
+    by rewrite demorgan_forall in HU.
+  * admit.
+  * admit.
+Admitted.
 
 Let C : K.(world).
 Proof.
@@ -359,40 +450,32 @@ Proof.
   rewrite /entails. apply demorgan_forall.
   exists C. apply demorgan_impl.
   split.
-  * intros e. red. intros ψ Hψ.
-    case (adequacy_forcing ϕ C ψ) => HC1 HC2.
-    apply HC1; [> |set_solver].
+  * intros e. red. intros ψ Hclosed Hψ.
+    case (adequacy_forcing C ψ Hclosed) => HC1 HC2.
+    apply HC1; [> |auto |set_solver].
     by apply (subseteq_ncompletion_completion _ _ 0).
   * apply demorgan_forall.
-    case (adequacy_forcing ϕ C ϕ) => HC1 HC2.
+    case (adequacy_forcing C ϕ Hϕ) => HC1 HC2.
     apply HC2. by apply completion_consistent.
 Qed.
 
-End Completeness.
+End KCompleteness.
 
-Lemma not_prov_tnderiv (ϕ : flower) :
-  ~ prov ϕ -> ∅ !⊬ ϕ.
-Proof.
-  move => H Φ HΦ Hderiv. apply H.
-  apply equiv_empty in HΦ. apply btot_equiv_empty in HΦ.
-  rewrite HΦ in Hderiv. by apply prov_deriv.
-Qed.
-
-Theorem completeness (ϕ : flower) :
+Theorem completeness (ϕ : flower) (Hclosed : closed 0 ϕ) :
   (∀ A (K : KModel A), ∅ ⊨ ϕ) -> prov ϕ.
 Proof.
   apply contra_recip. move => H H'. apply not_prov_tnderiv in H.
-  apply completeness_contra in H. move: H => [A' [K' H]].
-  apply H. apply H'. done.
+  apply completeness_contra in H; auto. move: H => [A' [K' H]].
+  apply H; auto.
 Qed.
 
 End Completeness.
 
 (** * Then we trivially get structural admissibility *)
 
-Theorem structural_admissibility (ϕ : flower) :
+Theorem structural_admissibility (ϕ : flower) (Hclosed : closed 0 ϕ) :
   sprov ϕ -> prov ϕ.
 Proof.
-  intros. apply completeness. intros.
+  intros. apply completeness; auto. intros.
   by apply soundness.
 Qed.

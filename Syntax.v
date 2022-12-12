@@ -30,6 +30,43 @@ Notation "γ ⫐ Δ" := (Flower γ Δ) (at level 65).
 Notation "γ ⫐" := (Flower γ nil) (at level 65).
 Notation "⫐ Δ" := (Flower ∅ Δ) (at level 65).
 
+(** ** Closed flowers *)
+
+Inductive tclosed (c : nat) : term -> Prop :=
+
+| tclosed_var n :
+  n < c ->
+  tclosed c (TVar n)
+
+| tclosed_fun f args :
+  Forall (tclosed c) args ->
+  tclosed c (TFun f args).
+
+Inductive closed (c : nat) : flower -> Prop :=
+
+| closed_atom p args :
+  Forall (tclosed c) args ->
+  closed c (Atom p args)
+
+| closed_flower n Φ Δ :
+  Forall (closed (c + n)) Φ ->
+  Forall (gclosed (c + n)) Δ ->
+  closed c (n ⋅ Φ ⫐ Δ)
+
+with gclosed (c : nat) : garden -> Prop :=
+
+| closed_garden n Φ :
+  Forall (closed (c + n)) Φ ->
+  gclosed c (n ⋅ Φ).
+
+
+Lemma tclosed_cst : ∀ t,
+  tclosed 0 t <-> cst t.
+Proof.
+  elim/term_induction => [n |f args IH]; split; intros H; inv H;
+  inv H1; econs; apply Forall_equiv in IH; intuition.
+Qed.
+
 (** ** Induction principles *)
 
 Definition flower_induction_full :
@@ -303,7 +340,7 @@ Fixpoint bv (X : ctx) : nat :=
 
 (** *** Check if a flower is closed *)
 
-Fixpoint closed (c : nat) (ϕ : flower) : bool :=
+(* Fixpoint closed (c : nat) (ϕ : flower) : bool :=
   match ϕ with
   | Atom p args => forallb (tclosed c <$> args)
   | n ⋅ Φ ⫐ Δ =>
@@ -311,7 +348,7 @@ Fixpoint closed (c : nat) (ϕ : flower) : bool :=
       forallb ((λ '(m ⋅ Ψ), forallb (closed (c + n + m) <$> Ψ)) <$> Δ)
   end.
 
-Definition cflower := { ϕ : flower | closed 0 ϕ }.
+Definition cflower := { ϕ : flower | closed 0 ϕ }. *)
 
 (** ** Context operations *)
 
@@ -1257,6 +1294,35 @@ Definition sderiv (Φ Ψ : bouquet) := ∀ X, Φ ⪽ X -> X ⋖ Ψ ≈>* X ⋖ [
 
 Infix "⊢" := deriv (at level 70).
 Infix "⊢s" := sderiv (at level 70).
+
+Lemma subpol : ∀ Φ X,
+  Φ ⪽ X ->
+  X ⋖ Φ ~>* X ⋖ [].
+Proof.
+  elim => [|ϕ Φ IH] X H //.
+
+  epose proof (Hϕ := subctx_subset ϕ _ _ _ H). Unshelve. 2: { set_solver. }
+  epose proof (HΦ := subctx_subset Φ _ _ _ H). Unshelve. 2: { set_solver. }
+
+  case (subctx_singl _ _ Hϕ) => {H} n [Hshift [Y [Z [Hpol ?]]]]; subst.
+  rewrite -fill_comp/=.
+  
+  estep. apply R_ctx.
+  set X0 := Planter [] □ Φ.
+  epose proof (Hp := R_pol (unshift n 0 ϕ) n (Z ⪡ X0)).
+  repeat rewrite -fill_comp/= is_shifted_shift_unshift in Hp; auto. apply Hp.
+  rewrite fmap_singl in Hpol. rewrite /ftob.
+  epose proof (Hp' := pollin_comp_out _ _ _ X0).
+  rewrite /= Nat.add_0_r in Hp'. by eapply Hp'.
+
+  repeat rewrite -fill_comp/= fill_comp.
+  by apply IH.
+Qed.
+
+#[export] Instance deriv_refl : Reflexive deriv.
+Proof.
+  intros ???. by apply subpol.
+Qed.
 
 Lemma deriv_sderiv Φ Ψ :
   Φ ⊢ Ψ -> Φ ⊢s Ψ.

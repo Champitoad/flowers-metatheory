@@ -88,8 +88,8 @@ Class KModel (D : Type) : Type := {
 
 Infix "≤" := accessible.
 
-(** * Given a Kripke model K, a world α ∈ K and an evaluation e in the domain of
-      α, forcing evaluates a flower into a (Coq) proposition. *)
+(** * Given a Kripke model K, a world w ∈ K and an evaluation e in the domain of
+      w, forcing evaluates a flower into a (Coq) proposition. *)
 
 Section Forcing.
 
@@ -128,11 +128,11 @@ Fixpoint fforces (w : world) (e : eval (model w)) (ϕ : flower) {struct ϕ} : Pr
       bforces w' e' Φ -> pforces w' e' Δ
   end.
 
-Definition forces α e (T : theory) :=
-  ∀ ϕ, ϕ ∈ T -> fforces α e ϕ.
+Definition forces w e (T : theory) :=
+  ∀ ϕ, closed 0 ϕ -> ϕ ∈ T -> fforces w e ϕ.
 
 Definition entails (T U : theory) :=
-  ∀ α, (∀ e, forces α e T) -> (∀ e, forces α e U).
+  ∀ w, (∀ e, forces w e T) -> (∀ e, forces w e U).
 
 Definition eqentails T U := entails T U /\ entails U T.
 
@@ -140,7 +140,7 @@ Definition eqentails T U := entails T U /\ entails U T.
 Proof.
   econs; red.
   * move => T. done.
-  * move => T1 T2 T3. rewrite /entails. move => H1 H2 α e H.
+  * move => T1 T2 T3. rewrite /entails. move => H1 H2 w e H.
     apply H2. by apply H1.
 Qed.
 
@@ -158,7 +158,7 @@ Qed.
 
 End Forcing.
 
-Notation "α : e ⊩ T" := (forces α e T) (at level 20, e at level 0).
+Notation "w ∷ e ⊩ T" := (forces w e T) (at level 20, e at level 0).
 
 #[export] Hint Extern 1 (entails _ _) => reflexivity : core.
 #[export] Hint Extern 1 (eqentails _ _) => reflexivity : core.
@@ -171,7 +171,7 @@ Add Parametric Morphism {A} (K : KModel A) : entails with signature
   as equiv_entails.
 Proof.
   rewrite /entails/forces.
-  move => T T' HT U U' HU H α Hf e ϕ Hϕ.
-  apply H. move => e' ϕ' Hϕ'. apply Hf. by apply HT.
+  move => T T' HT U U' HU H w Hf e ϕ ? Hϕ.
+  apply H; auto. move => e' ϕ' ? Hϕ'. apply Hf; auto. by apply HT.
   by apply HU.
 Qed.

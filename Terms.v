@@ -36,11 +36,11 @@ Qed.
 Inductive cst : term -> Prop :=
 | cst_fun f args : Forall cst args -> cst (TFun f args).
 
-Fixpoint tclosed (c : nat) (t : term) : bool :=
+(* Fixpoint tclosed (c : nat) (t : term) : bool :=
   match t with
   | TVar n => n <? c
   | TFun f args => forallb (tclosed c <$> args)
-  end.
+  end. *)
 
 Fixpoint tsubst (σ : nat -> term) (t : term) : term :=
   match t with
