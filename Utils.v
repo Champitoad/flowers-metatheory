@@ -286,6 +286,20 @@ Proof.
   constructor; intuition; apply IH; done.
 Qed.
 
+Lemma forall_Forall {A} (P : A -> Prop) : ∀ (l : list A),
+  (∀ x, P x) -> Forall P l.
+Proof.
+  elim => [|x l IH] //=.
+Qed.
+
+Lemma Forall_fmap {A} (P : A -> Prop) (f : A -> A) : ∀ (l : list A),
+  Forall P (f <$> l) <-> Forall (P ∘ f) l.
+Proof.
+  elim => [|x l IH] //=. split; intros H; inv H; econs.
+  * by rewrite -IH.
+  * by rewrite IH.
+Qed.
+
 Lemma Forall_eq_map {A B} (l : list A) (f g : A -> B) :
   (Forall (fun x => f x = g x) l) <->
   f <$> l = g <$> l.
@@ -342,6 +356,13 @@ Proof.
 Qed.
 
 (** * Sets *)
+
+Lemma elem_of_Forall {A} {P : A -> Prop} (x : A) : ∀ l,
+  x ∈ l -> Forall P l -> P x.
+Proof.
+  elim => [|y l IH] H HP; inv H.
+  inv HP. apply IH. assumption. inv HP.
+Qed.
 
 Ltac solve_elem_of_list :=
   match goal with

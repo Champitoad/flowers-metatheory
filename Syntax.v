@@ -1,6 +1,7 @@
 Require Import stdpp.list stdpp.relations stdpp.list_numbers.
 Require Import ssreflect.
 Require Import String.
+Require Import ZifyBool.
 
 Require Import Flowers.Terms Flowers.Utils.
 
@@ -59,6 +60,7 @@ with gclosed (c : nat) : garden -> Prop :=
   Forall (closed (c + n)) Φ ->
   gclosed c (n ⋅ Φ).
 
+Definition cflower := { ϕ : flower | closed 0 ϕ }.
 
 Lemma tclosed_cst : ∀ t,
   tclosed 0 t <-> cst t.
@@ -143,6 +145,57 @@ Proof.
   exact (λ _, I).
 Qed.
 
+(** *** Depth induction *)
+
+Fixpoint depth (ϕ : flower) {struct ϕ} : nat :=
+  let bdepth := max_list_with depth in
+  let gdepth '(_ ⋅ Φ) := bdepth Φ in
+  match ϕ with
+  | Atom _ _ => 0
+  | _ ⋅ Φ ⫐ Δ => S (max (bdepth Φ) (max_list_with gdepth Δ))
+  end.
+
+Lemma inv_depth_zero : ∀ ϕ,
+  depth ϕ = 0 -> ∃ p args, ϕ = Atom p args.
+Proof.
+  case => [p args |[??]?] H. by exists p, args. inv H.
+Qed.
+
+Lemma inv_depth_succ : ∀ ϕ n,
+  depth ϕ = S n -> ∃ γ Δ, ϕ = γ ⫐ Δ.
+Proof.
+  case => [?? |γ Δ] n H. inv H. by exists γ, Δ.
+Qed.
+
+Lemma flower_depth_ind :
+  ∀ (P : flower -> Prop), 
+  (∀ p args, P (Atom p args)) ->
+  (∀ γ Δ, (∀ ψ, depth ψ < depth (γ ⫐ Δ) -> P ψ) -> P (γ ⫐ Δ)) ->
+  ∀ ϕ, P ϕ.
+Proof.
+  intros P Hatom Hflower ϕ.
+  assert (H : ∃ n, depth ϕ <= n) by (by exists (depth ϕ)).
+  case: H => n H; move: n ϕ H.
+  elim => [|n IHn] ϕ H.
+  * assert (H' : depth ϕ = 0) by lia.
+    case (inv_depth_zero _ H') => p [args ?]; subst.
+    by apply Hatom.
+  * case (depth ϕ =? S n) eqn:?Hϕn.
+    - apply Nat.eqb_eq in Hϕn.
+      case (inv_depth_succ _ _ Hϕn) => γ [Δ ?]; subst.
+      apply Hflower. rewrite Hϕn. intros ψ Hψ.
+      assert (Hψ' : depth ψ <= n) by lia. by apply IHn.
+    - assert (Hϕ : depth ϕ <= n) by lia. by apply IHn.
+Qed.
+
+Lemma depth_pistil n Φ Δ :
+  ∀ ϕ, ϕ ∈ Φ -> depth ϕ < depth (n ⋅ Φ ⫐ Δ).
+Admitted.
+
+Lemma depth_petal n Φ Δ :
+  ∀ m Ψ, (m ⋅ Ψ) ∈ Δ -> ∀ ψ, ψ ∈ Ψ -> depth ψ < depth (n ⋅ Φ ⫐ Δ).
+Admitted.
+
 (** ** Operations on De Bruijn indices *)
 
 Fixpoint shift (n : nat) (c : nat) (ϕ : flower) : flower :=
@@ -167,7 +220,7 @@ Fixpoint unshift (n : nat) (c : nat) (ϕ : flower) : flower :=
 Definition gunshift n c '(m ⋅ Φ) : garden :=
   m ⋅ unshift n (c + m) <$> Φ.
 
-Fixpoint subst (σ : nat -> term) (ϕ : flower) : flower :=
+Fixpoint subst (σ : sbt) (ϕ : flower) : flower :=
   match ϕ with
   | Atom p args => Atom p (tsubst σ <$> args)
   | m ⋅ Φ ⫐ Δ =>
@@ -175,8 +228,19 @@ Fixpoint subst (σ : nat -> term) (ϕ : flower) : flower :=
         ((λ '(k ⋅ Ψ), k ⋅ subst (sshift (m + k) σ) <$> Ψ) : garden -> garden) <$> Δ
   end.
 
+Lemma depth_subst : ∀ ϕ σ,
+  depth (subst σ ϕ) = depth ϕ.
+Admitted.
+
+Definition bsubst σ (Φ : bouquet) : bouquet :=
+  subst σ <$> Φ.
+
 Definition gsubst σ '(m ⋅ Φ) : garden :=
   m ⋅ subst (sshift m σ) <$> Φ.
+
+Lemma subst_id : ∀ ϕ,
+  subst idsubst ϕ = ϕ.
+Admitted.
 
 Lemma shift_zero : ∀ ϕ c,
   shift 0 c ϕ = ϕ.

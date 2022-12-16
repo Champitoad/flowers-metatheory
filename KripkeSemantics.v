@@ -27,10 +27,22 @@ Proof.
   * inv Hϕ.
 Qed.
 
+Lemma elem_of_singl_btot ϕ :
+  ϕ ∈ btot (ftob ϕ).
+Proof.
+  set_solver.
+Qed.
+
+Lemma elem_of_singl_btot_inv {ϕ ψ} :
+  ϕ ∈ btot (ftob ψ) -> ϕ = ψ.
+Proof.
+  set_solver.
+Qed.
+
 (** * Pre-models are just domains with interpretation functions for terms and
       predicates *)
 
-Class premodel (D : Type) := {
+Record premodel {D : Type} := {
   domain : propset D;
   interp_fun : name -> list (elem domain) -> elem domain;
   interp_pred : name -> propset (list (elem domain))
@@ -38,7 +50,7 @@ Class premodel (D : Type) := {
 
 (* Pre-model inclusion is domain and interpretation inclusion *)
 
-Definition premodel_incl {D} (M1 M2 : premodel D) : Prop.
+Definition premodel_incl {D} (M1 M2 : @premodel D) : Prop.
 Proof.
   refine { H : M1.(domain) ⊆ M2.(domain) | _ }.
   refine (_ /\ _).
@@ -54,9 +66,9 @@ Defined.
 
 Section Eval.
 
-Context {D} (M : premodel D).
+Context {D} (M : @premodel D).
 
-Let dom := elem M.(domain).
+Definition dom := elem M.(domain).
 
 Definition eval := nat -> dom.
 
@@ -67,7 +79,7 @@ Fixpoint tapply_eval (e : eval) (t : term) {struct t} : dom :=
   match t with
   | TVar n => e n
   | TFun f args =>
-      interp_fun f (tapply_eval e <$> args)
+      M.(interp_fun) f (tapply_eval e <$> args)
   end.
 
 End Eval.
@@ -78,11 +90,11 @@ End Eval.
 Definition monotone {A B : Type} (RA : relation A) (RB : relation B) (f : A -> B) :=
   ∀ x y, RA x y -> RB (f x) (f y).
 
-Class KModel (D : Type) : Type := {
+Class KModel {D : Type} : Type := {
   world : Type;
   accessible : relation world;
   accessible_po : PreOrder accessible;
-  model : world -> premodel D;
+  model : world -> @premodel D;
   model_mono : monotone accessible premodel_incl model;
 }.
 
@@ -93,7 +105,7 @@ Infix "≤" := accessible.
 
 Section Forcing.
 
-Context {D} {K : KModel D}.
+Context {D} {K : @KModel D}.
 
 Lemma eval_incl {w w'} :
   w ≤ w' -> eval (model w) -> eval (model w').
@@ -121,18 +133,33 @@ Fixpoint fforces (w : world) (e : eval (model w)) (ϕ : flower) {struct ϕ} : Pr
     end in
   match ϕ with
   | Atom p args =>
-      tapply_eval (model w) e <$> args ∈ interp_pred p
+      tapply_eval (model w) e <$> args ∈ (model w).(interp_pred) p
   | Flower (n ⋅ Φ) Δ =>
       ∀ w' (H : w ≤ w'), ∀ (en : eval (model w')),
       let e' := update (model w') n en (eval_incl H e) in
       bforces w' e' Φ -> pforces w' e' Δ
   end.
 
-Definition forces w e (T : theory) :=
-  ∀ ϕ, closed 0 ϕ -> ϕ ∈ T -> fforces w e ϕ.
+Definition bforces w e : bouquet -> Prop :=
+  Forall (fforces w e).
+
+Definition pforces w e : petals -> Prop :=
+  Exists (λ '(n ⋅ Φ), ∃ (en : eval (model w)),
+          bforces w (update (model w) n en e) Φ).
+
+Lemma fforces_flower w e n Φ Δ :
+  fforces w e (n ⋅ Φ ⫐ Δ) <->
+  ∀ w' (H : w ≤ w'), ∀ (en : eval (model w')),
+  let e' := update (model w') n en (eval_incl H e) in
+  bforces w' e' Φ -> pforces w' e' Δ.
+Proof.
+Admitted.
+
+Definition forces w (T : theory) :=
+  ∀ ϕ, ϕ ∈ T -> ∀ e, fforces w e ϕ.
 
 Definition entails (T U : theory) :=
-  ∀ w, (∀ e, forces w e T) -> (∀ e, forces w e U).
+  ∀ w, forces w T -> forces w U.
 
 Definition eqentails T U := entails T U /\ entails U T.
 
@@ -158,7 +185,7 @@ Qed.
 
 End Forcing.
 
-Notation "w ∷ e ⊩ T" := (forces w e T) (at level 20, e at level 0).
+Notation "w ⊩ T" := (forces w T) (at level 20).
 
 #[export] Hint Extern 1 (entails _ _) => reflexivity : core.
 #[export] Hint Extern 1 (eqentails _ _) => reflexivity : core.
@@ -166,12 +193,12 @@ Notation "w ∷ e ⊩ T" := (forces w e T) (at level 20, e at level 0).
 Infix "⊨" := entails (at level 40).
 Infix "⫤⊨" := eqentails (at level 40).
 
-Add Parametric Morphism {A} (K : KModel A) : entails with signature
+Add Parametric Morphism {A} (K : @KModel A) : entails with signature
   equiv ==> equiv ==> impl
   as equiv_entails.
 Proof.
   rewrite /entails/forces.
-  move => T T' HT U U' HU H w Hf e ϕ ? Hϕ.
-  apply H; auto. move => e' ϕ' ? Hϕ'. apply Hf; auto. by apply HT.
+  move => T T' HT U U' HU H w Hf e ϕ Hϕ.
+  apply H; auto. move => e' ϕ' Hϕ'. apply Hf; auto. by apply HT.
   by apply HU.
 Qed.

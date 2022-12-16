@@ -1,7 +1,7 @@
 Require Import String.
 Open Scope string_scope.
 Require Import ssreflect stdpp.propset stdpp.relations.
-Require Import Classical ClassicalFacts ProofIrrelevance.
+Require Import Classical ClassicalFacts ProofIrrelevance FunctionalExtensionality.
 
 Require Import Flowers.Terms Flowers.Syntax Flowers.KripkeSemantics Flowers.Utils.
 
@@ -46,11 +46,15 @@ Proof.
   * destruct H as [x H]. intro H1. destruct H. apply H1.
 Qed.
 
+Section Metatheory.
+
+Context (Hclosed : ∀ (T : theory) (ϕ : flower), ϕ ∈ T -> closed 0 ϕ).
+
 (** * Soundness *)
 
 Section Soundness.
 
-Context A (K : KModel A).
+Context A (K : @KModel A).
 
 Lemma local_soundness (Φ Ψ : bouquet) :
   Φ ⇀ Ψ -> Φ ⫤⊨ Ψ.
@@ -72,8 +76,8 @@ Proof.
   induction H1 as [X Φ Ψ H |P Φ].
   * apply grounding. by apply local_soundness.
   * apply pgrounding.
-    red. intros * _.
-    red. intros e ?? H. inv H.
+    red. intros w Hw.
+    red. intros. inv H.
 Qed.
 
 Theorem soundness (Φ : bouquet) :
@@ -161,17 +165,8 @@ Qed.
 
 Section Inversion.
 
-Definition has_dom (n : nat) (σ : nat -> term) :=
-  ∀ m, m >= n -> σ m = TVar m.
-
 Context (T : theory) (ϕ : flower).
 Context (Hcon : consistent ϕ T) (Hcom : complete ϕ T).
-
-Lemma inversion_flower_elem_of n Φ Δ :
-  (n ⋅ Φ ⫐ Δ) ∈ T -> ∀ σ, has_dom n σ ->
-  (∃ m Ψ τ, (m ⋅ Ψ) ∈ Δ /\ has_dom m τ /\ btot (subst τ <$> (subst σ <$> Ψ)) ⊆ T) \/
-  ∃ ψ, ψ ∈ Φ /\ T !⊬ subst σ ψ.
-Admitted.
 
 Lemma inversion_tnderiv_atom p args :
   T !⊬ (Atom p args) -> Atom p args ∉ T.
@@ -181,8 +176,8 @@ Proof.
 Qed.
 
 Lemma inversion_tnderiv_flower n Φ Δ :
-  T !⊬ (n ⋅ Φ ⫐ Δ) -> ∃ σ, has_dom n σ /\
-  ∀ m Ψ τ, (m ⋅ Ψ) ∈ Δ -> has_dom m τ ->
+  T !⊬ (n ⋅ Φ ⫐ Δ) -> ∃ σ, has_range n σ /\
+  ∀ m Ψ τ, (m ⋅ Ψ) ∈ Δ -> has_range m τ ->
   ∀ ψ, ψ ∈ Ψ -> T ∪ btot (subst σ <$> Φ) !⊬ subst τ (subst σ ψ).
 Admitted.
 
@@ -320,7 +315,7 @@ Proof.
   * move => [??][??][??]??/=. etransitivity; eauto.
 Qed.
 
-Let model (w : world) : premodel term.
+Let model (w : world) : @premodel term.
 Proof.
   refine (let '(T ↾ _) := w in _).
   refine {| domain := {[ t | cst t ]}; interp_fun := _; interp_pred := _ |}.
@@ -332,15 +327,16 @@ Defined.
 
 Let model_mono : monotone accessible premodel_incl model.
 Proof.
-  move => [T HT] [U HU] /= Hsub. red.
-  exists (PreOrder_Reflexive domain). split; intros.
+  move => [T HT] [U HU] Hsub. red.
+  exists (PreOrder_Reflexive (domain (model (T ↾ HT)))).
+  split; intros.
   * simpl. apply eq_sig. f_equal.
     by rewrite proj1_elem_subseteq_list.
   * repeat rewrite elem_of_PropSet. move => H. apply Hsub.
     by rewrite proj1_elem_subseteq_list.
 Qed.
 
-Instance KCanon : KModel term :=
+Instance KCanon : @KModel term :=
   {| KripkeSemantics.world := world;
      KripkeSemantics.accessible := accessible;
      KripkeSemantics.accessible_po := accessible_po;
@@ -349,23 +345,50 @@ Instance KCanon : KModel term :=
 
 End Canonical.
 
+Opaque model.
+
 (** ** Completeness *)
 
 Section KCompleteness.
 
-Context (T : theory) (ϕ : flower) (Hϕ : closed 0 ϕ) (Hcon : consistent ϕ T).
+Context (T : theory) (ϕ : flower) (Hcon : consistent ϕ T).
 
 Let K := KCanon ϕ.
 
+Lemma eval_supset (w w' : K.(world)) :
+  w ≤ w' -> eval (model w') -> eval (model w).
+Proof.
+  move => H e.
+  refine (fun n => _).
+  case (e n) => [t Ht].
+  destruct w as [U HU]; set w := U ↾ HU.
+  destruct w' as [U' HU']; set w' := (U' ↾ HU') in Ht.
+  rewrite /dom/= in Ht |- *.
+  by exists t.
+Qed.
+
+Lemma forces_mono (w w' : K.(world)) U :
+  w ≤ w' -> forces w U -> forces w' U.
+Proof.
+  rewrite /forces. intros Hl H ψ HU e.
+  pose (e' := eval_supset _ _ Hl e).
+  specialize (H ψ HU e').
+Admitted.
+
+Definition eval_to_sbt (w : K.(world)) (e : eval (model w)) : sbt :=
+  λ n, proj1_sig (e n).
+
+Notation "⌊ e ⌋ @ w" := (eval_to_sbt w e) (format "⌊ e ⌋ @ w", at level 5).
+
 Lemma tapply_eval_TFun (w : K.(world)) e f args :
   tapply_eval (model w) e (TFun f args) =
-  interp_fun f (tapply_eval (model w) e <$> args).
+  interp_fun (model w) f (tapply_eval (model w) e <$> args).
 Proof.
   done.
 Qed.
 
 Lemma proj1_interp_fun (w : K.(world)) f args :
-  proj1_sig ((K.(model) w).(interp_fun) f args) =
+  proj1_sig (interp_fun (model w) f args) =
   TFun f (proj1_sig <$> args).
 Proof.
   by destruct w as [U [HUcon HUcom]].
@@ -398,41 +421,179 @@ Proof.
 Defined.
 
 Lemma atom_elem_of_forces (w : K.(world)) p args :
-  let '(exist _ U (conj Hcon Hcom)) := w in
+  let '(exist _ U _) := w in
   Forall (tclosed 0) args ->
-  Atom p args ∈ U <-> (∀ e, w ∷ e ⊩ Atom p args).
+  Atom p args ∈ U <-> w ⊩ Atom p args.
 Proof.
   destruct w as [U [HUcon HUcom]] eqn:Hw.
   set W : K.(world) := U ↾ conj HUcon HUcom.
-  intros Hclosed; split; intros H.
-  * intros e. red. intros ψ _ Hψ.
-    assert (Heq : ψ = Atom p args) by set_solver; rewrite Heq; clear Heq Hψ.
+  intros Hargs; split; intros H.
+  * intros ψ Hψ e.
+    rewrite (elem_of_singl_btot_inv Hψ); clear Hψ.
     red. rewrite [interp_pred _]/=. apply elem_of_PropSet.
     rewrite (proj1_tapply_eval_fmap W); done.
-  * specialize (H (dummy_eval W)). cbn in H.
-    rewrite /forces/= in H.
-    specialize (H (Atom p args)).
-    rewrite /fforces [interp_pred _]/= in H.
-    apply elem_of_PropSet in H.
-    - rewrite (proj1_tapply_eval_fmap W) in H; done.
-    - by constructor.
-    - set_solver.
+  * red in H.
+    specialize (H (Atom p args)
+                  (elem_of_singl_btot (Atom p args)) (dummy_eval W)).
+    rewrite /fforces [interp_pred _]/= elem_of_PropSet in H.
+    rewrite (proj1_tapply_eval_fmap W) in H; done.
 Qed.
 
-Lemma adequacy_forcing (w : K.(world)) :
-  let '(exist _ U (conj Hcon Hcom)) := w in
-  ∀ (ψ : flower), closed 0 ψ ->
-  (ψ ∈ U -> ∀ e, w ∷ e ⊩ ψ) /\ (U !⊬ ψ -> ∃ e, ~ w ∷ e ⊩ ψ).
+Lemma proj1_comp {A B} {P : B -> Prop} (f : A -> {x : B | P x}) :
+  (λ x : A, proj1_sig (f x)) = proj1_sig ∘ f.
 Proof.
-  destruct w as [U [HUcon HUcom]] eqn:Hw.
-  set W : K.(world) := U ↾ conj HUcon HUcom.
-  elim/flower_induction => [p args |[n Φ] Δ IHΦ IHΔ] Hclosed;
-  inv Hclosed; split; intros H.
-  * apply (atom_elem_of_forces W); done.
-  * assert (HU : Atom p args ∉ U) by (apply (inversion_tnderiv_atom _ ϕ); auto).
-    rewrite (atom_elem_of_forces W) in HU; auto.
-    by rewrite demorgan_forall in HU.
+  done.
+Qed.
+
+Lemma tapply_eval_subst (w : K.(world)) e : ∀ t,
+  proj1_sig (tapply_eval (model w) e t) = tsubst ⌊e⌋@w t.
+Proof.
+  elim/term_induction => [n |f args IH] //=.
+  apply Forall_eq_map in IH. rewrite -IH /=.
+  by rewrite proj1_comp list_fmap_compose proj1_interp_fun.
+Qed.
+
+Lemma tapply_eval_subst_fmap (w : K.(world)) e : ∀ (ts : list term),
+  proj1_sig <$> (tapply_eval (model w) e <$> ts) = tsubst ⌊e⌋@w <$> ts.
+Proof.
+  intros ts. rewrite -list_fmap_compose.
+  apply Forall_eq_map. induction ts; auto. econs.
+  by rewrite /compose tapply_eval_subst.
+Qed.
+
+Lemma tclosed_eval (w : K.(world)) e : ∀ t,
+  tclosed 0 (tsubst ⌊e⌋@w t).
+Admitted.
+
+Lemma closed_eval (w : K.(world)) e : ∀ ψ,
+  closed 0 (subst ⌊e⌋@w ψ).
+Admitted.
+
+Lemma eval_eval (w : K.(world)) e :
+  tsubst ⌊e⌋@w ∘ tsubst ⌊e⌋@w = tsubst ⌊e⌋@w.
+Proof.
+  apply functional_extensionality.
+Admitted.
+
+Lemma fforces_subst : ∀ ψ (w : K.(world)) e,
+  fforces w e ψ <-> w ⊩ subst ⌊e⌋@w ψ.
+Proof.
+  elim/flower_induction => [p args |[n Φ] Δ IHγ IHΔ] w e;
+  destruct w as [U [HUcon HUcom]];
+  set w : K.(world) := U ↾ conj HUcon HUcom.
+  * assert (Hargs : Forall (tclosed 0) (tsubst ⌊e⌋@w <$> args)).
+    { apply Forall_fmap. apply forall_Forall. by apply tclosed_eval. }
+    simpl; split; intros.
+    - apply (atom_elem_of_forces w); auto.
+      rewrite elem_of_PropSet in H.
+      by rewrite -tapply_eval_subst_fmap.
+    - apply (atom_elem_of_forces w) in H; auto.
+      apply elem_of_PropSet.
+      by rewrite -tapply_eval_subst_fmap in H.
+  * split; intros H.
+    - simpl. intros ψ Hψ e''.
+      rewrite (elem_of_singl_btot_inv Hψ) {Hψ}.
+      repeat rewrite fforces_flower in H |- *.
+      intros w' Hw' en enu HΦ.
+      specialize (H w' Hw' en).
+      rewrite Forall_forall in IHγ; specialize (IHγ w').
+      (* rewrite Forall_forall in IHγ; specialize (IHγ e'). *)
+      (* rewrite Forall_forall in IHγ; specialize (IHγ (sshift n ⌊e⌋@w)). *)
+Admitted.
+
+Lemma bforces_bsubst : ∀ Ψ (w : K.(world)) e,
+  bforces w e Ψ <-> w ⊩ bsubst ⌊e⌋@w Ψ.
+Admitted.
+
+Definition forces_flower (w : K.(world)) (n : nat) (Φ : bouquet) (Δ : petals) :=
+  ∀ w', w ≤ w' -> ∀ e, w' ⊩ (bsubst ⌊e⌋@w' Φ) ->
+  ∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ w' ⊩ (bsubst ⌊e'⌋@w' (bsubst ⌊e⌋@w' Ψ)).
+
+Lemma forces_forces_flower (w : K.(world)) n Φ Δ :
+  closed 0 (n ⋅ Φ ⫐ Δ) ->
+  w ⊩ (n ⋅ Φ ⫐ Δ) <-> forces_flower w n Φ Δ.
+Proof.
+  intros Hc. rewrite /forces_flower. split; intros H.
+  * intros w' Hw' e HΦ. apply (forces_mono _ w') in H; auto.
+    specialize (H (n ⋅ Φ ⫐ Δ) (elem_of_singl_btot (n ⋅ Φ ⫐ Δ)) e).
+    apply bforces_bsubst in HΦ.
+    rewrite fforces_flower in H.
+    specialize (H w' (@PreOrder_Reflexive _ _ accessible_po w') e).
+Admitted.
+
+Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
+  let '(exist _ U _) := w in
+  (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) e,
+  let '(exist _ V _) := w' in
+  (∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ btot (bsubst ⌊e'⌋@w' (bsubst ⌊e⌋@w' Ψ)) ⊆ U) \/
+  ∃ ψ, ψ ∈ Φ /\ U !⊬ subst ⌊e⌋@w' ψ.
+Admitted.
+
+Lemma forces_empty (w : K.(world)) :
+  w ⊩ btot [].
+Proof.
+  intros ? H ?. inv H.
+Qed.
+
+Lemma forces_cons (w : K.(world)) ψ Ψ :
+  w ⊩ btot (ψ :: Ψ) <-> w ⊩ ψ /\ w ⊩ btot Ψ.
+Proof.
+  split; intros H.
   * admit.
+  * move: H => [Hψ HΨ].
+    intros ψ0 H e. inv H.
+    apply Hψ; auto; set_solver.
+    apply HΨ; auto; set_solver.
+Admitted.
+
+Lemma forces_flower_in_bouquet (w : K.(world)) (Ψ : bouquet) (ψ : flower) :
+  ψ ∈ Ψ -> w ⊩ Ψ -> w ⊩ ψ.
+Admitted.
+
+Lemma adequacy_forcing : ∀ (ψ : flower) (w : K.(world)),
+  let '(exist _ U _) := w in
+  (ψ ∈ U -> w ⊩ ψ) /\ (closed 0 ψ -> U !⊬ ψ -> ~ w ⊩ ψ).
+Proof.
+  elim/flower_depth_ind => [p args |[n Φ] Δ IH] w;
+  destruct w as [U [HUcon HUcom]];
+  set w : K.(world) := U ↾ conj HUcon HUcom;
+  split.
+  * intros H. 
+    assert (Hc : closed 0 (Atom p args)) by (by apply (Hclosed U)). inv Hc.
+    apply (atom_elem_of_forces w); done.
+  * intros Hc H. inv Hc.
+    assert (HU : Atom p args ∉ U) by (apply (inversion_tnderiv_atom _ ϕ); auto).
+    rewrite (atom_elem_of_forces w) in HU; auto.
+  * intros H.
+    assert (Hc : closed 0 (n ⋅ Φ ⫐ Δ)) by (by apply (Hclosed U)).
+    apply forces_forces_flower; auto.
+    intros w' Hw e HΦ.
+    destruct w' as [V [HVcon HVcom]];
+    set w' : K.(world) := V ↾ conj HVcon HVcom in Hw e HΦ |- *.
+    assert (HinV : (n ⋅ Φ ⫐ Δ) ∈ V) by admit. (* by monotonicity of K.(model) *)
+    pose proof (H' := inversion_flower_elem_of w' n Φ Δ HinV w' e).
+    case: H' => [[m [Ψ [e' [HΨΔ HΨU]]]]|[ψ [Hψ H']]].
+    - exists m, Ψ, e'. split; auto.
+      pose proof (Hd := depth_petal n Φ _ _ _ HΨΔ); clear HΨΔ.
+      induction Ψ as [|ψ Ψ IHΨ]; simpl.
+      by apply forces_empty.
+      apply forces_cons. split.
+      + set ψs := subst ⌊e'⌋@w' (subst ⌊e⌋@w' ψ).
+        assert (Hdψ : depth ψ < depth (n ⋅ Φ ⫐ Δ)) by (apply Hd; left).
+        assert (Hdψs : depth ψ = depth ψs ) by (by repeat rewrite depth_subst).
+        rewrite Hdψs in Hdψ.
+        specialize (IH ψs Hdψ w').
+        case IH => IH1 _.
+        apply IH1. set_solver.
+      + apply IHΨ. set_solver.
+        intros. apply Hd. set_solver.
+    - set ψs := subst ⌊e⌋@w' ψ in H' HΦ |- *.
+      pose proof (Hd := depth_pistil n _ Δ _ Hψ).
+      assert (Hdψs : depth ψ = depth ψs ) by (by repeat rewrite depth_subst).
+      rewrite Hdψs in Hd. specialize (IH ψs Hd w').
+      case IH => _ IH2. destruct IH2; auto. by apply closed_eval.
+      assert (HψsΦ : ψs ∈ bsubst ⌊e⌋@w' Φ) by set_solver.
+      by apply (forces_flower_in_bouquet _ (bsubst ⌊e⌋@w' Φ) ψs).
   * admit.
 Admitted.
 
@@ -444,25 +605,24 @@ Proof.
 Defined.
 
 Lemma completeness_contra :
-  T !⊬ ϕ -> ∃ A (K : KModel A), ~ (T ⊨ ϕ).
+  closed 0 ϕ -> T !⊬ ϕ -> ∃ A (K : @KModel A), ~ (T ⊨ ϕ).
 Proof.
-  intros H. exists term. exists K.
+  intros Hc H. exists term. exists K.
   rewrite /entails. apply demorgan_forall.
   exists C. apply demorgan_impl.
   split.
-  * intros e. red. intros ψ Hclosed Hψ.
-    case (adequacy_forcing C ψ Hclosed) => HC1 HC2.
-    apply HC1; [> |auto |set_solver].
+  * intros ψ Hψ e.
+    case (adequacy_forcing ψ C) => HC1 HC2.
+    apply HC1; [> auto |set_solver].
     by apply (subseteq_ncompletion_completion _ _ 0).
-  * apply demorgan_forall.
-    case (adequacy_forcing C ϕ Hϕ) => HC1 HC2.
-    apply HC2. by apply completion_consistent.
+  * case (adequacy_forcing ϕ C) => HC1 HC2.
+    apply HC2; auto. by apply completion_consistent.
 Qed.
 
 End KCompleteness.
 
-Theorem completeness (ϕ : flower) (Hclosed : closed 0 ϕ) :
-  (∀ A (K : KModel A), ∅ ⊨ ϕ) -> prov ϕ.
+Theorem completeness (ϕ : flower) (Hc : closed 0 ϕ) :
+  (∀ A (K : @KModel A), ∅ ⊨ ϕ) -> prov ϕ.
 Proof.
   apply contra_recip. move => H H'. apply not_prov_tnderiv in H.
   apply completeness_contra in H; auto. move: H => [A' [K' H]].
@@ -473,9 +633,11 @@ End Completeness.
 
 (** * Then we trivially get structural admissibility *)
 
-Theorem structural_admissibility (ϕ : flower) (Hclosed : closed 0 ϕ) :
+Theorem structural_admissibility (ϕ : flower) (Hc : closed 0 ϕ) :
   sprov ϕ -> prov ϕ.
 Proof.
   intros. apply completeness; auto. intros.
   by apply soundness.
 Qed.
+
+End Metatheory.

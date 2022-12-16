@@ -42,13 +42,35 @@ Inductive cst : term -> Prop :=
   | TFun f args => forallb (tclosed c <$> args)
   end. *)
 
-Fixpoint tsubst (σ : nat -> term) (t : term) : term :=
+Definition sbt := nat -> term.
+
+Fixpoint tsubst (σ : sbt) (t : term) : term :=
   match t with
   | TVar m => σ m
   | TFun f args => TFun f (tsubst σ <$> args)
   end.
 
-Definition mksubst (n : nat) (t : term) : nat -> term :=
+Definition idsubst : sbt :=
+  λ n, TVar n.
+
+Lemma tsubst_id : ∀ t,
+  tsubst idsubst t = t.
+Proof.
+  elim/term_induction => [n |f args IH] //=.
+  do 2 f_equal. apply Forall_eq_map in IH.
+  by rewrite map_id_ext in IH.
+Qed.
+
+Definition has_range (n : nat) (σ : sbt) :=
+  ∀ m, m >= n -> σ m = TVar m.
+
+Lemma has_range_id : ∀ n,
+  has_range n idsubst.
+Proof.
+  done.
+Qed.
+
+Definition mksubst (n : nat) (t : term) : sbt :=
   λ m, if n =? m then t else TVar m.
 
 Notation "n ↦ u" := (mksubst n u) (at level 20).
@@ -189,7 +211,7 @@ Proof.
     by rewrite H.
 Qed.
 
-Definition sshift (n : nat) (σ : nat -> term) : nat -> term :=
+Definition sshift (n : nat) (σ : sbt) : sbt :=
   λ m, if m <? n then TVar m else tshift n 0 (σ (m - n)). 
 
 Lemma sshift_zero σ :
