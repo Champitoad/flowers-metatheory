@@ -69,6 +69,26 @@ Proof.
   inv H1; econs; apply Forall_equiv in IH; intuition.
 Qed.
 
+Lemma tsubst_cst σ : ∀ t,
+  cst t ->
+  tsubst σ t = t.
+Proof.
+  elim/term_induction => [n |f args IH] H //=; inv H.
+  apply Forall_impl in IH; auto.
+  apply Forall_eq_map in IH.
+  by rewrite IH list_fmap_id.
+Qed.
+
+Lemma tshift_cst n c : ∀ t,
+  cst t ->
+  tshift n c t = t.
+Proof.
+  elim/term_induction => [i |f args IH] H //=; inv H.
+  apply Forall_impl in IH; auto.
+  apply Forall_eq_map in IH.
+  by rewrite IH list_fmap_id.
+Qed.
+
 (** ** Induction principles *)
 
 Definition flower_induction_full :

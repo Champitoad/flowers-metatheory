@@ -355,6 +355,18 @@ Context (T : theory) (ϕ : flower) (Hcon : consistent ϕ T).
 
 Let K := KCanon ϕ.
 
+Lemma eval_incl_refl (w : K.(world)) (H : w ≤ w) e :
+  eval_incl H e = e.
+Proof.
+  repeat red in H.
+  destruct w as [U HU].
+  assert (H = λ _ x, x) by apply proof_irrelevance; subst.
+  apply functional_extensionality. intros i.
+  rewrite /eval_incl/=. destruct (e i).
+  pose proof (H := proof_irrelevance _ (PreOrder_Reflexive {[ t | cst t ]} x e0) e0).
+  by rewrite H.
+Qed.
+
 Lemma eval_supset (w w' : K.(world)) :
   w ≤ w' -> eval (model w') -> eval (model w).
 Proof.
@@ -461,19 +473,38 @@ Proof.
   by rewrite /compose tapply_eval_subst.
 Qed.
 
-Lemma tclosed_eval (w : K.(world)) e : ∀ t,
-  tclosed 0 (tsubst ⌊e⌋@w t).
+Lemma cst_eval (w : K.(world)) e : ∀ t,
+  cst (tsubst ⌊e⌋@w t).
 Admitted.
 
 Lemma closed_eval (w : K.(world)) e : ∀ ψ,
   closed 0 (subst ⌊e⌋@w ψ).
 Admitted.
 
-Lemma eval_eval (w : K.(world)) e :
-  tsubst ⌊e⌋@w ∘ tsubst ⌊e⌋@w = tsubst ⌊e⌋@w.
+Lemma eval_eval (w : K.(world)) e' e t :
+  tsubst ⌊e'⌋@w (tsubst ⌊e⌋@w t) = tsubst ⌊e⌋@w t.
 Proof.
-  apply functional_extensionality.
-Admitted.
+  rewrite tsubst_cst. by apply cst_eval. done.
+Qed.
+
+Lemma tsubst_eval_tvar (w : K.(world)) e n :
+  tsubst ⌊e⌋@w (TVar n) = ⌊e⌋@w n.
+Proof.
+  done.
+Qed.
+
+Lemma update_sshift (w : K.(world)) n en e :
+  ⌊update (model w) n en e⌋@w = ⌊en⌋@w • sshift n ⌊e⌋@w.
+Proof.
+  apply functional_extensionality. intros i.
+  rewrite /comp_subst/=.
+  rewrite /update/sshift {1}/eval_to_sbt /=.
+  destruct (i <? n) eqn:Hin.
+  by rewrite tsubst_eval_tvar.
+  rewrite tshift_cst. rewrite -tsubst_eval_tvar. by apply cst_eval.
+  rewrite tsubst_cst. rewrite -tsubst_eval_tvar. by apply cst_eval.
+  done.
+Qed.
 
 Lemma fforces_subst : ∀ ψ (w : K.(world)) e,
   fforces w e ψ <-> w ⊩ subst ⌊e⌋@w ψ.
@@ -482,7 +513,8 @@ Proof.
   destruct w as [U [HUcon HUcom]];
   set w : K.(world) := U ↾ conj HUcon HUcom.
   * assert (Hargs : Forall (tclosed 0) (tsubst ⌊e⌋@w <$> args)).
-    { apply Forall_fmap. apply forall_Forall. by apply tclosed_eval. }
+    { apply Forall_fmap. apply forall_Forall.
+      intros. apply tclosed_cst. apply cst_eval. }
     simpl; split; intros.
     - apply (atom_elem_of_forces w); auto.
       rewrite elem_of_PropSet in H.
@@ -507,7 +539,7 @@ Admitted.
 
 Definition forces_flower (w : K.(world)) (n : nat) (Φ : bouquet) (Δ : petals) :=
   ∀ w', w ≤ w' -> ∀ e, w' ⊩ (bsubst ⌊e⌋@w' Φ) ->
-  ∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ w' ⊩ (bsubst ⌊e'⌋@w' (bsubst ⌊e⌋@w' Ψ)).
+  ∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ w' ⊩ (bsubst ⌊update (model w') m e' e⌋@w' Ψ).
 
 Lemma forces_forces_flower (w : K.(world)) n Φ Δ :
   closed 0 (n ⋅ Φ ⫐ Δ) ->
@@ -515,17 +547,22 @@ Lemma forces_forces_flower (w : K.(world)) n Φ Δ :
 Proof.
   intros Hc. rewrite /forces_flower. split; intros H.
   * intros w' Hw' e HΦ. apply (forces_mono _ w') in H; auto.
-    specialize (H (n ⋅ Φ ⫐ Δ) (elem_of_singl_btot (n ⋅ Φ ⫐ Δ)) e).
+    specialize (H (n ⋅ Φ ⫐ Δ) (elem_of_singl_btot (n ⋅ Φ ⫐ Δ)) (eshift (model w') n e)).
     apply bforces_bsubst in HΦ.
     rewrite fforces_flower in H.
     specialize (H w' (@PreOrder_Reflexive _ _ accessible_po w') e).
+    rewrite eval_incl_refl update_eshift in H.
+    specialize (H HΦ). red in H. apply Exists_exists in H.
+    case: H => [[m Ψ] [HΨΔ [en HΨ]]].
+    exists m, Ψ, en. split; auto.
+    by apply bforces_bsubst.
 Admitted.
 
 Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
   let '(exist _ U _) := w in
   (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) e,
   let '(exist _ V _) := w' in
-  (∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ btot (bsubst ⌊e'⌋@w' (bsubst ⌊e⌋@w' Ψ)) ⊆ U) \/
+  (∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ btot (bsubst ⌊update (model w') m e' e⌋@w' Ψ) ⊆ U) \/
   ∃ ψ, ψ ∈ Φ /\ U !⊬ subst ⌊e⌋@w' ψ.
 Admitted.
 
@@ -578,7 +615,7 @@ Proof.
       induction Ψ as [|ψ Ψ IHΨ]; simpl.
       by apply forces_empty.
       apply forces_cons. split.
-      + set ψs := subst ⌊e'⌋@w' (subst ⌊e⌋@w' ψ).
+      + set ψs := subst ⌊update (model w') m e' e⌋@w' ψ.
         assert (Hdψ : depth ψ < depth (n ⋅ Φ ⫐ Δ)) by (apply Hd; left).
         assert (Hdψs : depth ψ = depth ψs ) by (by repeat rewrite depth_subst).
         rewrite Hdψs in Hdψ.

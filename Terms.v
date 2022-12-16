@@ -53,6 +53,11 @@ Fixpoint tsubst (σ : sbt) (t : term) : term :=
 Definition idsubst : sbt :=
   λ n, TVar n.
 
+Definition comp_subst (σ τ : sbt) : sbt :=
+  λ n, tsubst σ (τ n).
+
+Infix "•" := comp_subst (at level 20).
+
 Lemma tsubst_id : ∀ t,
   tsubst idsubst t = t.
 Proof.

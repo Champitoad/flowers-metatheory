@@ -1,4 +1,5 @@
 Require Import ssreflect stdpp.boolset stdpp.propset stdpp.vector.
+Require Import FunctionalExtensionality.
 
 Require Import Flowers.Utils Flowers.Terms Flowers.Syntax.
 
@@ -73,7 +74,19 @@ Definition dom := elem M.(domain).
 Definition eval := nat -> dom.
 
 Definition update (n : nat) (e1 e2 : eval) :=
-  fun m => if m <? n then e1 m else e2 (m - n).
+  λ m, if m <? n then e1 m else e2 (m - n).
+
+Definition eshift (n : nat) (e : eval) :=
+  λ m, e (m + n).
+
+Lemma update_eshift n e :
+  update n e (eshift n e) = e.
+Proof.
+  apply functional_extensionality. intros i.
+  rewrite /update/eshift. destruct (i <? n) eqn:Hin; auto.
+  assert (H : i - n + n = i) by lia.
+  by rewrite H.
+Qed.
 
 Fixpoint tapply_eval (e : eval) (t : term) {struct t} : dom :=
   match t with
