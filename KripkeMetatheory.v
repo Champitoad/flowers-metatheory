@@ -1,9 +1,20 @@
 Require Import String.
 Open Scope string_scope.
 Require Import ssreflect stdpp.propset stdpp.relations.
-Require Import Classical ClassicalFacts ProofIrrelevance FunctionalExtensionality.
+Require Import Classical ClassicalFacts ProofIrrelevance FunctionalExtensionality Logic.Epsilon.
 
 Require Import Flowers.Terms Flowers.Syntax Flowers.KripkeSemantics Flowers.Utils.
+
+(** Epsilon operator *)
+
+Lemma ex_sigT {A} (i : inhabited A) (P : A -> Prop) :
+  (∃ x, P x) -> { x & P x }.
+Proof.
+  intros H.
+  pose proof (HϵP := epsilon_spec i P H).
+  set ϵP := epsilon i P in HϵP.
+  by exists ϵP.
+Qed.
 
 (** Useful intuitionistic reasoning principles *)
 
@@ -20,6 +31,12 @@ Proof.
 Qed.
 
 (** Useful classical reasoning principles *)
+
+Lemma nnpp {P : Prop} :
+  ~ ~ P <-> P.
+Proof.
+  tauto.
+Qed.
 
 Lemma contra_recip {P Q : Prop} :
   (~ Q -> ~ P) -> P -> Q.
@@ -579,6 +596,25 @@ Proof.
     exists ee. by apply bforces_bsubst.
 Qed.
 
+Definition list_map_projT1 {A B} (P : A -> B -> Prop) (l : list A) :
+  (∀ x, x ∈ l -> {y & P x y}) -> list B.
+Admitted.
+
+Lemma list_map_projT2 {A B} (P : A -> B -> Prop) (l : list A) :
+  ∀ f : (∀ x, x ∈ l -> {y & P x y}),
+  Forall2 P l (list_map_projT1 P l f).
+Admitted.
+
+Lemma elem_of_concat {A} (x : A) (l : list (list A)) :
+  x ∈ concat l -> ∃ l0, l0 ∈ l /\ x ∈ l0.
+Proof.
+  intros H. induction l as [|y l IH]. inv H.
+  rewrite concat_cons elem_of_app in H.
+  case: H => [H|H].
+  * exists y. split; auto. by left.
+  * case (IH H) => {IH} l0 [Hl0l Hxl0]. exists l0. split; auto. by right.
+Qed.
+
 Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
   let '(exist _ U _) := w in
   (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) (Hw' : w ≤ w') e,
@@ -590,16 +626,33 @@ Proof.
   intros Hin w'.
   destruct w' as [V [HVcon HVcom]]; set w' : K.(world) := V ↾ conj HVcon HVcom.
   intros Hw'.
-  apply NNPP. intro H.
-  rewrite demorgan_forall in H;
-  setoid_rewrite demorgan_or in H;
-  repeat setoid_rewrite demorgan_exists in H;
-  repeat setoid_rewrite demorgan_and in H;
-  setoid_rewrite <- impl_or in H.
-  move: H => [e [H1 H2]].
+  apply NNPP.
+  rewrite demorgan_forall demorgan_exists; intros e;
+  rewrite demorgan_or;
+  repeat setoid_rewrite demorgan_exists;
+  repeat setoid_rewrite demorgan_and;
+  repeat setoid_rewrite <- impl_or;
+  setoid_rewrite <- tderiv_tnderiv;
+  setoid_rewrite nnpp.
+  intros H1 H2.
   assert (V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
-  { red. (* take the finite union of all [proj1_ex (H2 ψ _)] for all ψ ∈ Φ *)
-    admit. }
+  { rewrite /tderiv in H2 |- *.
+    assert (H2' : ∀ x : flower, x ∈ Φ → {Φ & btot Φ ⊆ U ∧ Φ ⊢ subst ⌊e⌋@w' x}).
+    { intros. apply ex_sigT; done. }
+    (* take the finite union of all [projT1 (H2' ψ _)] for all ψ ∈ Φ *)
+    pose proof (HΨs := list_map_projT2 _ Φ H2').
+    set Ψs := list_map_projT1 _ Φ H2' in HΨs.
+    set Ψ := concat Ψs.
+    exists (Ψ ++ [n ⋅ Φ ⫐ Δ]). split.
+    * intros ψ Hψ. rewrite elem_of_btot elem_of_app in Hψ.
+      case: Hψ => [Hψ|Hψ].
+      - left. case (elem_of_concat _ _ Hψ) => [Ψ0 [HΨ0Ψs HψΨ0]].
+        assert (H : Forall (λ Ψ0, btot Ψ0 ⊆ U) Ψs) by admit.
+        apply (elem_of_Forall _ _ HΨ0Ψs) in H. set_solver.
+      - by right.
+    * assert (Ψ ⊢ bsubst ⌊e⌋@w' Φ) by admit.
+      rewrite /deriv in H |- *. intros X HX.
+      admit. }
   assert (~ V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
   { rewrite /ftob/btot compr_singl union_elem_of; auto.
     by apply tderiv_tnderiv. }

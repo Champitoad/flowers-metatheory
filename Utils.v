@@ -474,11 +474,6 @@ Proof.
   set_solver.
 Qed.
 
-(* Lemma nsubseteq_exists {A} {X Y : propset A} :
-  X ⊈ Y -> ∃ x, x ∈ X /\ x ∉ Y.
-Proof.
-Admitted. *)
-
 Lemma proper_app_subseteq {A} : forall (l1' l1 l2 l2' : list A),
   l1 ⊆ l1' -> l2 ⊆ l2' ->
   l1 ++ l2 ⊆ l1' ++ l2'.

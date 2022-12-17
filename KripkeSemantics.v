@@ -40,6 +40,12 @@ Proof.
   set_solver.
 Qed.
 
+Lemma elem_of_btot ϕ Φ :
+  ϕ ∈ btot Φ <-> ϕ ∈ Φ.
+Proof.
+  set_solver.
+Qed.
+
 (** * Pre-models are just domains with interpretation functions for terms and
       predicates *)
 
