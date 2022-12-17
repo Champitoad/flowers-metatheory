@@ -27,14 +27,16 @@ Proof.
   tauto.
 Qed.
 
-Lemma demorgan_impl {P Q} :
-  ~ (impl P Q) <-> P /\ ~ Q.
+Lemma impl_or {P Q : Prop} :
+  (P -> Q) <-> ~ P \/ Q.
 Proof.
-  split; intro H.
-  * split.
-    - apply NNPP. intro H1. apply H. intro H2. destruct H1. exact H2.
-    - intro H1. apply H. intros _. exact H1.
-  * intuition.
+  tauto.
+Qed.
+
+Lemma demorgan_impl_and {P Q : Prop} :
+  ~ (P -> Q) <-> P /\ ~ Q.
+Proof.
+  tauto.
 Qed.
 
 Lemma demorgan_forall {A} {P : A -> Prop} :
@@ -44,6 +46,12 @@ Proof.
   * apply NNPP. intro H1. destruct H. intros x.
     apply NNPP. intro H2. destruct H1. exists x. exact H2.
   * destruct H as [x H]. intro H1. destruct H. apply H1.
+Qed.
+
+Lemma demorgan_and {P Q} :
+  ~ (P /\ Q) <-> ~ P \/ ~ Q.
+Proof.
+  tauto.
 Qed.
 
 Section Metatheory.
@@ -119,6 +127,12 @@ Proof.
   rewrite HΦ in Hderiv. by apply prov_deriv.
 Qed.
 
+Lemma deriv_tderiv Φ (ϕ : flower) :
+  Φ ⊢ ϕ -> Φ !⊢ ϕ.
+Proof.
+  by exists Φ.
+Qed.
+
 Lemma tderiv_tnderiv {T} {ϕ} :
   ~ (T !⊢ ϕ) <-> T !⊬ ϕ.
 Proof.
@@ -149,16 +163,17 @@ Proof.
   by (exists Ψ; set_solver).
 Qed.
 
+Add Parametric Morphism : tnderiv with signature
+  equiv ==> eq ==> iff
+  as proper_tnderiv_equiv.
+Proof.
+  intros. repeat rewrite -tderiv_tnderiv. by rewrite H.
+Qed.
+
 Lemma tderiv_weakening {T T' : theory} {ϕ : flower} :
   T ⊆ T' -> T !⊢ ϕ -> T' !⊢ ϕ.
 Proof.
   intros Hincl. rewrite /tderiv. set_solver.
-Qed.
-
-Lemma deriv_tderiv Φ (ϕ : flower) :
-  Φ ⊢ ϕ -> Φ !⊢ ϕ.
-Proof.
-  by exists Φ.
 Qed.
 
 (** ** Inversion principles for consistent and complete theories *)
@@ -556,14 +571,39 @@ Proof.
     case: H => [[m Ψ] [HΨΔ [en HΨ]]].
     exists m, Ψ, en. split; auto.
     by apply bforces_bsubst.
-Admitted.
+  * intros ψ Hin e. rewrite (elem_of_singl_btot_inv Hin); subst; clear Hin.
+    rewrite fforces_flower. intros w' Hw' en e' HΦ.
+    apply bforces_bsubst in HΦ.
+    case (H w' Hw' e' HΦ) => {H} [m [Ψ [ee [Hin H]]]].
+    apply Exists_exists. exists (m ⋅ Ψ). split; auto.
+    exists ee. by apply bforces_bsubst.
+Qed.
 
 Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
   let '(exist _ U _) := w in
-  (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) e,
+  (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) (Hw' : w ≤ w') e,
   let '(exist _ V _) := w' in
   (∃ m Ψ e', (m ⋅ Ψ) ∈ Δ /\ btot (bsubst ⌊update (model w') m e' e⌋@w' Ψ) ⊆ U) \/
   ∃ ψ, ψ ∈ Φ /\ U !⊬ subst ⌊e⌋@w' ψ.
+Proof.
+  destruct w as [U HU]; set w : K.(world) := U ↾ HU.
+  intros Hin w'.
+  destruct w' as [V [HVcon HVcom]]; set w' : K.(world) := V ↾ conj HVcon HVcom.
+  intros Hw'.
+  apply NNPP. intro H.
+  rewrite demorgan_forall in H;
+  setoid_rewrite demorgan_or in H;
+  repeat setoid_rewrite demorgan_exists in H;
+  repeat setoid_rewrite demorgan_and in H;
+  setoid_rewrite <- impl_or in H.
+  move: H => [e [H1 H2]].
+  assert (V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
+  { red. (* take the finite union of all [proj1_ex (H2 ψ _)] for all ψ ∈ Φ *)
+    admit. }
+  assert (~ V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
+  { rewrite /ftob/btot compr_singl union_elem_of; auto.
+    by apply tderiv_tnderiv. }
+  done.
 Admitted.
 
 Lemma forces_empty (w : K.(world)) :
@@ -607,8 +647,9 @@ Proof.
     intros w' Hw e HΦ.
     destruct w' as [V [HVcon HVcom]];
     set w' : K.(world) := V ↾ conj HVcon HVcom in Hw e HΦ |- *.
-    assert (HinV : (n ⋅ Φ ⫐ Δ) ∈ V) by admit. (* by monotonicity of K.(model) *)
-    pose proof (H' := inversion_flower_elem_of w' n Φ Δ HinV w' e).
+    assert (HinV : (n ⋅ Φ ⫐ Δ) ∈ V) by done.
+    pose proof (H' := inversion_flower_elem_of w' n Φ Δ HinV w'
+                      (@PreOrder_Reflexive _ _ accessible_po w') e).
     case: H' => [[m [Ψ [e' [HΨΔ HΨU]]]]|[ψ [Hψ H']]].
     - exists m, Ψ, e'. split; auto.
       pose proof (Hd := depth_petal n Φ _ _ _ HΨΔ); clear HΨΔ.
@@ -646,7 +687,7 @@ Lemma completeness_contra :
 Proof.
   intros Hc H. exists term. exists K.
   rewrite /entails. apply demorgan_forall.
-  exists C. apply demorgan_impl.
+  exists C. apply demorgan_impl_and.
   split.
   * intros ψ Hψ e.
     case (adequacy_forcing ψ C) => HC1 HC2.

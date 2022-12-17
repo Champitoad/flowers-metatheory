@@ -426,6 +426,18 @@ Proof.
   set_solver.
 Qed.
 
+Lemma union_elem_of {A} (X : propset A) (x : A) :
+  x ∈ X -> X ∪ {[x]} ≡ X.
+Proof.
+  set_solver.
+Qed.
+
+Lemma compr_singl {A} (x : A) :
+  {[ y | y ∈ [x] ]} ≡ {[x]}.
+Proof.
+  set_solver.
+Qed.
+
 Lemma subseteq_union_equiv {A} (X Y : propset A) :
   X ⊆ Y -> X ∪ Y ≡ Y.
 Proof.
