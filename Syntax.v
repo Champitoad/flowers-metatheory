@@ -258,8 +258,16 @@ Definition bsubst σ (Φ : bouquet) : bouquet :=
 Definition gsubst σ '(m ⋅ Φ) : garden :=
   m ⋅ subst (sshift m σ) <$> Φ.
 
-Lemma subst_id : ∀ ϕ,
-  subst idsubst ϕ = ϕ.
+Lemma subst_id :
+  subst idsubst = id.
+Admitted.
+
+Lemma bsubst_id :
+  bsubst idsubst = id.
+Admitted.
+
+Lemma gsubst_id :
+  gsubst idsubst = id.
 Admitted.
 
 Lemma shift_zero : ∀ ϕ c,
@@ -965,8 +973,6 @@ Qed.
 
 (** * Basic proof search *)
 
-(* TODO: rewrite all tactics *)
-
 Ltac sub_at p :=
   match goal with
   | |- ?Φ ~>* _ => eval cbn in (bget p Φ)
@@ -1344,6 +1350,83 @@ Ltac bypet Δ Δ' :=
 
 Ltac estep := etransitivity; [> eapply rtc_once |].
 
+(** * Useful derivable rules *)
+
+Lemma subcopol : ∀ Φ X,
+  Φ ⪽ X ->
+  X ⋖ [] ~>* X ⋖ Φ.
+Proof.
+  elim => [|ϕ Φ IH] X H //.
+  etransitivity. apply IH.
+  apply (subctx_subset _ (ϕ :: Φ)); auto. by right.
+
+  apply (subctx_subset ϕ) in H.
+  2: { red. red. intros. rewrite cons_app. solve_elem_of_list. }
+  case (subctx_singl _ _ H) => {H} n [Hshift [Y [Z [Hpol ?]]]]; subst.
+  rewrite -fill_comp/=.
+  
+  estep. apply R_ctx.
+  set X0 := Planter [] □ Φ.
+  epose proof (Hp := R_copol (unshift n 0 ϕ) n (Z ⪡ X0)).
+  repeat rewrite -fill_comp/= in Hp. eapply Hp.
+  rewrite fmap_singl in Hpol. rewrite /ftob.
+  epose proof (Hp' := pollin_comp_out _ _ _ X0).
+  rewrite /= Nat.add_0_r in Hp'. by eapply Hp'.
+
+  rewrite is_shifted_shift_unshift. done.
+  by rewrite -fill_comp.
+Qed.
+
+Lemma subcopolepis X Φ Ψ :
+  Φ ⪽ X ->
+  X ⋖ Ψ ~>* X ⋖ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]]. 
+Proof.
+  move => H.
+  estep. apply R_ctx. apply R_coepis.
+  set Y := Pistil 0 □ [0 ⋅ Ψ].
+  epose proof (Hp := subcopol _ (X ⪡ Y)).
+  repeat rewrite -fill_comp/= in Hp. eapply Hp.
+  subctxout H.
+Qed.
+
+Lemma contraction Φ :
+  Φ ~>* Φ ++ Φ.
+Proof.
+  pose proof (Hp := R_copol Φ 0 (Planter Φ □ [])).
+  list_simplifier. rewrite bshift_zero in Hp.
+  apply rtc_once. rself. apply Hp.
+  epose proof (Hpol := P_wind_r Φ □ [] [] []).
+  by list_simplifier.
+Qed.
+
+Lemma cocontraction Φ :
+  Φ ++ Φ ~>* Φ.
+Proof.
+  pose proof (Hp := R_pol Φ 0 (Planter Φ □ [])).
+  list_simplifier. rewrite bshift_zero in Hp.
+  apply rtc_once. rself. apply Hp.
+  epose proof (Hpol := P_wind_r Φ □ [] [] []).
+  by list_simplifier.
+Qed.
+
+Lemma nipis : ∀ n Φ Δ σ,
+  n ⋅ Φ ⫐ Δ ~>*
+  list_init (S n) (λ i, i ⋅ bsubst (σ/(n-i)) Φ ⫐ gsubst (σ/(n-i)) <$> Δ).
+Proof.
+  elim => [|n IH] Φ Δ σ /=.
+  * rewrite on_range_zero bsubst_id gsubst_id map_id_ext /=.
+    reflexivity.
+  * estep. rself.
+    apply (R_ipis 0 (σ 0)). by lia.
+    assert (H : n - n = 0) by lia; rewrite H; clear H.
+    rewrite on_range_zero bsubst_id gsubst_id map_id_ext /=.
+    simpl in IH.
+    etransitivity.
+    set ϕ := (x in [x; _]).
+    epose proof (cstep_congr (Planter [] □ (S n ⋅ Φ ⫐ Δ)) ϕ _). simpl in H.
+    apply H. eapply (IH _ _ σ).
+Admitted.
+
 (** * Provability *)
 
 Definition prov Φ := Φ ~>* [].
@@ -1483,43 +1566,6 @@ Proof.
 Admitted. *)
 
 (** ** Deduction *)
-
-Lemma subcopol : ∀ Φ X,
-  Φ ⪽ X ->
-  X ⋖ [] ~>* X ⋖ Φ.
-Proof.
-  elim => [|ϕ Φ IH] X H //.
-  etransitivity. apply IH.
-  apply (subctx_subset _ (ϕ :: Φ)); auto. by right.
-
-  apply (subctx_subset ϕ) in H.
-  2: { red. red. intros. rewrite cons_app. solve_elem_of_list. }
-  case (subctx_singl _ _ H) => {H} n [Hshift [Y [Z [Hpol ?]]]]; subst.
-  rewrite -fill_comp/=.
-  
-  estep. apply R_ctx.
-  set X0 := Planter [] □ Φ.
-  epose proof (Hp := R_copol (unshift n 0 ϕ) n (Z ⪡ X0)).
-  repeat rewrite -fill_comp/= in Hp. eapply Hp.
-  rewrite fmap_singl in Hpol. rewrite /ftob.
-  epose proof (Hp' := pollin_comp_out _ _ _ X0).
-  rewrite /= Nat.add_0_r in Hp'. by eapply Hp'.
-
-  rewrite is_shifted_shift_unshift. done.
-  by rewrite -fill_comp.
-Qed.
-
-Lemma subcopolepis X Φ Ψ :
-  Φ ⪽ X ->
-  X ⋖ Ψ ~>* X ⋖ [0 ⋅ Φ ⫐ [0 ⋅ Ψ]]. 
-Proof.
-  move => H.
-  estep. apply R_ctx. apply R_coepis.
-  set Y := Pistil 0 □ [0 ⋅ Ψ].
-  epose proof (Hp := subcopol _ (X ⪡ Y)).
-  repeat rewrite -fill_comp/= in Hp. eapply Hp.
-  subctxout H.
-Qed.
 
 Theorem deduction Φ Ψ :
   Φ ⊢ Ψ <-> [] ⊢ 0 ⋅ Φ ⫐ [0 ⋅ Ψ].

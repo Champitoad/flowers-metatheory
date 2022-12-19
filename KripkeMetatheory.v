@@ -652,6 +652,10 @@ Proof.
       - by right.
     * assert (Ψ ⊢ bsubst ⌊e⌋@w' Φ) by admit.
       rewrite /deriv in H |- *. intros X HX.
+      etransitivity; [> apply (subcopolepis _ _ _ HX)|].
+      apply cstep_congr.
+      specialize (H (Pistil 0 (Planter Ψ (Pistil n □ Δ) []) [0 ⋅ [ϕ]])).
+      simpl in H.
       admit. }
   assert (~ V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
   { rewrite /ftob/btot compr_singl union_elem_of; auto.

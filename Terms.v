@@ -64,15 +64,34 @@ Proof.
   elim/term_induction => [n |f args IH] //=.
   do 2 f_equal. apply Forall_eq_map in IH.
   by rewrite map_id_ext in IH.
-Qed.
+Qed. 
 
-Definition has_range (n : nat) (σ : sbt) :=
+Definition has_range (n : nat) (σ : sbt) : Prop :=
   ∀ m, m >= n -> σ m = TVar m.
+
+Definition on_range (n : nat) (σ : sbt) : sbt :=
+  λ m, if m <? n then σ m else TVar m.
+
+Notation "σ / n" := (on_range n σ) (format "σ / n").
 
 Lemma has_range_id : ∀ n,
   has_range n idsubst.
 Proof.
   done.
+Qed.
+
+Lemma has_range_on_range n σ :
+  has_range n (on_range n σ).
+Proof.
+  rewrite /has_range/on_range. intros m Hm.
+  assert (H : m <? n = false) by lia. by rewrite H.
+Qed.
+
+Lemma on_range_zero σ :
+  σ/0 = idsubst.
+Proof.
+  apply functional_extensionality. intros n.
+  by rewrite /on_range/idsubst/=.
 Qed.
 
 Definition mksubst (n : nat) (t : term) : sbt :=

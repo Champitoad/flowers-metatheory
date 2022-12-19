@@ -78,6 +78,12 @@ Definition bijective {A B} (f : A -> B) :=
 
 (** * Lists *)
 
+Fixpoint list_init {A} (n : nat) (f : nat -> A) :=
+  match n with
+  | 0 => []
+  | S m => f m :: list_init m f
+  end.
+
 Lemma equiv_nil {A} : ∀ (l : list A),
   l ≡@{list A} [] -> l = [].
 Proof.
