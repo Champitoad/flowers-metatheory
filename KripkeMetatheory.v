@@ -616,6 +616,7 @@ Proof.
 Qed.
 
 Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
+  closed 0 (n ⋅ Φ ⫐ Δ) ->
   let '(exist _ U _) := w in
   (n ⋅ Φ ⫐ Δ) ∈ U -> ∀ (w' : K.(world)) (Hw' : w ≤ w') e,
   let '(exist _ V _) := w' in
@@ -623,7 +624,7 @@ Lemma inversion_flower_elem_of (w : K.(world)) n Φ Δ :
   ∃ ψ, ψ ∈ Φ /\ U !⊬ subst ⌊e⌋@w' ψ.
 Proof.
   destruct w as [U HU]; set w : K.(world) := U ↾ HU.
-  intros Hin w'.
+  intros Hc Hin w'.
   destruct w' as [V [HVcon HVcom]]; set w' : K.(world) := V ↾ conj HVcon HVcom.
   intros Hw'.
   apply NNPP.
@@ -639,23 +640,68 @@ Proof.
   { rewrite /tderiv in H2 |- *.
     assert (H2' : ∀ x : flower, x ∈ Φ → {Φ & btot Φ ⊆ U ∧ Φ ⊢ subst ⌊e⌋@w' x}).
     { intros. apply ex_sigT; done. }
+
     (* take the finite union of all [projT1 (H2' ψ _)] for all ψ ∈ Φ *)
     pose proof (HΨs := list_map_projT2 _ Φ H2').
     set Ψs := list_map_projT1 _ Φ H2' in HΨs.
     set Ψ := concat Ψs.
-    exists (Ψ ++ [n ⋅ Φ ⫐ Δ]). split.
-    * intros ψ Hψ. rewrite elem_of_btot elem_of_app in Hψ.
-      case: Hψ => [Hψ|Hψ].
-      - left. case (elem_of_concat _ _ Hψ) => [Ψ0 [HΨ0Ψs HψΨ0]].
-        assert (H : Forall (λ Ψ0, btot Ψ0 ⊆ U) Ψs) by admit.
-        apply (elem_of_Forall _ _ HΨ0Ψs) in H. set_solver.
-      - by right.
-    * assert (Ψ ⊢ bsubst ⌊e⌋@w' Φ) by admit.
-      rewrite /deriv in H |- *. intros X HX.
-      etransitivity; [> apply (subcopolepis _ _ _ HX)|].
-      apply cstep_congr.
-      specialize (H (Pistil 0 (Planter Ψ (Pistil n □ Δ) []) [0 ⋅ [ϕ]])).
-      simpl in H.
+
+    induction Δ as [|[m Θ] Δ IH].
+    * exists (Ψ ++ [n ⋅ Φ ⫐]). split.
+      - intros ψ Hψ. rewrite elem_of_btot elem_of_app in Hψ.
+        case: Hψ => [Hψ|Hψ].
+        + left. case (elem_of_concat _ _ Hψ) => [Ψ0 [HΨ0Ψs HψΨ0]].
+          assert (H : Forall (λ Ψ0, btot Ψ0 ⊆ U) Ψs) by admit.
+          apply (elem_of_Forall _ _ HΨ0Ψs) in H. set_solver.
+        + by right.
+      - assert (Ψ ⊢ bsubst ⌊e⌋@w' Φ).
+        { (* Let 1 ≤ i ≤ n with n the size of Φ.
+            Then by HΨs, we have that Ψs!!i ⊢ subst ⌊e⌋@w' Φ!!i.
+            Thus by weakening, Ψ ⊢ subst ⌊e⌋@w' Φ!!i. *)
+          admit. }
+        rewrite /deriv in H |- *. intros X HX.
+        etransitivity; [> apply (subcopolepis _ _ _ HX)|]; clear HX.
+        apply cstep_congr; clear X.
+        specialize (H (Pistil 0 (Planter Ψ (Pistil 0 □ []) []) [0 ⋅ [ϕ]])).
+        simpl in H.
+        (* - I instantiate the n variables of Φ using rule R_ipis with
+             substitution ⌊e⌋@w' restricted to n.
+           - By Hc, n ⋅ Φ ⫐ Δ is closed, and thus substituting for n is the same
+             as substituting for everything.
+           - Thus I can rewrite H in the conclusion.
+           - Then by rule R_epis, I only need to prove
+               Ψ ++ (∅ ⫐) ⫐ [0 ⋅ ϕ].
+           - I am done by ex falso quodlibet (rule R_rep). *)
+        pose proof (R_ipis 0).
+        admit.
+    * epose proof (H := H1 m Θ _ _).
+      (* By H, there is some θ ∈ Θ such that
+          subst ⌊update (model w') m ?x e⌋@w' θ ∉ U.
+        By completeness of U, we get that there is some Ψ0 ⊆ U such that
+          Ψ0 ++ [subst ⌊update (model w') m ?x e⌋@w' θ] ⊢ ϕ
+        Then we take Φ0 := Ψ0 ++ [n ⋅ Φ ⫐ (m ⋅ Θ) :: Δ].
+        Since Ψ0 ⊆ U, we trivially get Ψ0 ⊆ V, and thus
+          Ψ0 ++ [n ⋅ Φ ⫐ (m ⋅ Θ) :: Δ] ⊆ V ∪ (n ⋅ Φ ⫐ (m ⋅ Θ) :: Δ).
+        It remains to show that
+          Ψ0 ++ [n ⋅ Φ ⫐ (m ⋅ Θ) :: Δ] ⊢ ϕ.
+        Basically same proof as before up to applying the R_rep rule,
+        where we have to prove
+          0 ⋅ Ψ0 ⫐ 0 ⋅ [m ⋅ Θ ⫐ shift m 0 ϕ] ++ (λ '(m0 ⋅ Θ0), m0 ⋅ Θ0 ⫐ shift m0 0 ϕ).
+        Then by R_ipis with ⌊e⌋@w' restricted to m (resp. m0), we get
+          0 ⋅ Ψ0 ⫐ 0 ⋅ [0 ⋅ subst ⌊e⌋@w' Θ ⫐ unshift m 0 (subst ⌊e⌋@w' (shift m 0 ϕ))] ++ (λ '(m0 ⋅ Θ0), 0 ⋅ Θ0 ⫐ unshift (subst ⌊e⌋@w' (shift m0 0 ϕ)))
+        which is the same as
+          0 ⋅ Ψ0 ⫐ 0 ⋅ [0 ⋅ subst ⌊e⌋@w' Θ ⫐ ϕ] ++ (λ '(m0 ⋅ Θ0), 0 ⋅ Θ0 ⫐ ϕ) <$> Δ.
+        Finally, we can set ?x := e to simplify
+          Ψ0 ++ [subst ⌊update (model w') m ?x e⌋@w' θ] ⊢ ϕ
+        into
+          Ψ0 ++ [subst ⌊e⌋@w' θ] ⊢ ϕ,
+        which can be used with
+          X := 0 ⋅ Ψ0 ⫐ 0 ⋅ [0 ⋅ subst ⌊e⌋@w' θ ⫐ [0 ⋅ □]] ++ (λ ...) <$> Δ
+        in order to get
+          0 ⋅ Ψ0 ⫐ 0 ⋅ [0 ⋅ subst ⌊e⌋@w' Θ ⫐ [0 ⋅ []]] ++ (λ '(m0 ⋅ Θ0), 0 ⋅ Θ0 ⫐ ϕ) <$> Δ.
+        Normally we'd need to get the IH in the right form to be able to
+        use it, but well you got the idea, we do the same for ever petal in Δ...
+         *)
       admit. }
   assert (~ V ∪ (n ⋅ Φ ⫐ Δ) !⊢ ϕ).
   { rewrite /ftob/btot compr_singl union_elem_of; auto.
@@ -705,7 +751,7 @@ Proof.
     destruct w' as [V [HVcon HVcom]];
     set w' : K.(world) := V ↾ conj HVcon HVcom in Hw e HΦ |- *.
     assert (HinV : (n ⋅ Φ ⫐ Δ) ∈ V) by done.
-    pose proof (H' := inversion_flower_elem_of w' n Φ Δ HinV w'
+    pose proof (H' := inversion_flower_elem_of w' n Φ Δ Hc HinV w'
                       (@PreOrder_Reflexive _ _ accessible_po w') e).
     case: H' => [[m [Ψ [e' [HΨΔ HΨU]]]]|[ψ [Hψ H']]].
     - exists m, Ψ, e'. split; auto.
@@ -729,7 +775,7 @@ Proof.
       case IH => _ IH2. destruct IH2; auto. by apply closed_eval.
       assert (HψsΦ : ψs ∈ bsubst ⌊e⌋@w' Φ) by set_solver.
       by apply (forces_flower_in_bouquet _ (bsubst ⌊e⌋@w' Φ) ψs).
-  * admit.
+  * intros Hc H. intro HH.
 Admitted.
 
 Let C : K.(world).
